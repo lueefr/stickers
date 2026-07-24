@@ -45,6 +45,8 @@ class CropAndScaleService {
     required String outputFile,
     required Duration start,
     required Duration end,
+    int rotationDegrees = 0,
+    bool cropToSquare = true,
   }) async {
     try {
       await _methodChannel.invokeMethod('startTrim', {
@@ -52,6 +54,8 @@ class CropAndScaleService {
         'outputFile': outputFile,
         'startTimeUs': start.inMicroseconds.toString(),
         'endTimeUs': end.inMicroseconds.toString(),
+        'rotationDegrees': rotationDegrees.toString(),
+        'cropToSquare': cropToSquare.toString(),
       });
     } on PlatformException catch (e) {
       print("Failed to start transcoding: '${e.message}'.");

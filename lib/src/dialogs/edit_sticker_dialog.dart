@@ -84,6 +84,13 @@ class _EditStickerDialogState extends State<EditStickerDialog> {
                             style: TextStyle(color: Theme.of(context).colorScheme.error),
                           ),
                         ),
+                        TextButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).pop("edit");
+                          },
+                          icon: Icon(Icons.edit),
+                          label: Text(AppLocalizations.of(context)!.edit),
+                        ),
                         FilledButton(
                           onPressed: valid
                               ? () {

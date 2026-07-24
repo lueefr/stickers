@@ -60,57 +60,69 @@ class _TextEditingDialogState extends State<TextEditingDialog> {
       filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
       child: LayoutBuilder(builder: (context, constraints) {
         final isHorizontal = constraints.maxWidth > constraints.maxHeight;
+        final editableTextStack = Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(right: 3.0),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Text(
+                  widget.controller.text,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    inherit: false,
+                    fontSize: widget.parent.text.fontSize *
+                        (FontsRegistry.sizeMultiplier(widget.parent.text.fontName) ?? 1),
+                    foreground: Paint()
+                      ..strokeJoin = StrokeJoin.round
+                      ..strokeCap = StrokeCap.round
+                      ..color = widget.parent.text.outlineColor
+                      ..style = PaintingStyle.stroke
+                      ..strokeWidth = widget.parent.text.outlineWidth,
+                    fontFamily: widget.parent.text.fontName,
+                  ),
+                ),
+              ]),
+            ),
+            EditableText(
+              autofocus: true,
+              onChanged: (_) {
+                widget.parent.text.text = widget.controller.text;
+                setState(() {});
+              },
+              onEditingComplete: () {
+                widget.disableEditing();
+              },
+              maxLines: null,
+              cursorOpacityAnimates: true,
+              scrollPhysics: const NeverScrollableScrollPhysics(),
+              controller: widget.controller,
+              textAlign: TextAlign.center,
+              focusNode: widget.focusNode,
+              style: TextStyle(
+                inherit: false,
+                fontSize: widget.parent.text.fontSize *
+                    (FontsRegistry.sizeMultiplier(widget.parent.text.fontName) ?? 1),
+                color: widget.parent.text.textColor,
+                fontFamily: widget.parent.text.fontName,
+              ),
+              cursorColor: widget.parent.text.textColor,
+              backgroundCursorColor: widget.parent.text.textColor,
+            ),
+          ],
+        );
+        final decoratedTextField = widget.parent.data.backgroundColor == Colors.transparent
+            ? editableTextStack
+            : Container(
+                padding: EdgeInsets.all(widget.parent.data.backgroundPadding),
+                decoration: BoxDecoration(
+                  color: widget.parent.data.backgroundColor,
+                  borderRadius: BorderRadius.circular(widget.parent.data.backgroundRadius),
+                ),
+                child: editableTextStack,
+              );
         final textField = Padding(
           padding: const EdgeInsets.all(24.0),
-          child: Stack(
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(right: 3.0),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  Text(
-                    widget.controller.text,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      inherit: false,
-                      fontSize: widget.parent.text.fontSize *
-                          (FontsRegistry.sizeMultiplier(widget.parent.text.fontName) ?? 1),
-                      foreground: Paint()
-                        ..strokeJoin = StrokeJoin.round
-                        ..strokeCap = StrokeCap.round
-                        ..color = widget.parent.text.outlineColor
-                        ..style = PaintingStyle.stroke
-                        ..strokeWidth = widget.parent.text.outlineWidth,
-                      fontFamily: widget.parent.text.fontName,
-                    ),
-                  ),
-                ]),
-              ),
-              EditableText(
-                autofocus: true,
-                onChanged: (_) {
-                  setState(() {});
-                },
-                onEditingComplete: () {
-                  widget.disableEditing();
-                },
-                maxLines: null,
-                cursorOpacityAnimates: true,
-                scrollPhysics: const NeverScrollableScrollPhysics(),
-                controller: widget.controller,
-                textAlign: TextAlign.center,
-                focusNode: widget.focusNode,
-                style: TextStyle(
-                  inherit: false,
-                  fontSize: widget.parent.text.fontSize *
-                      (FontsRegistry.sizeMultiplier(widget.parent.text.fontName) ?? 1),
-                  color: widget.parent.text.textColor,
-                  fontFamily: widget.parent.text.fontName,
-                ),
-                cursorColor: widget.parent.text.textColor,
-                backgroundCursorColor: widget.parent.text.textColor,
-              ),
-            ],
-          ),
+          child: Center(child: decoratedTextField),
         );
         final topActionBar = GestureDetector(
           onTap: () => widget.disableEditing(),
@@ -285,6 +297,36 @@ class _TextEditingDialogState extends State<TextEditingDialog> {
                 _setTool(3);
               },
             ),
+            LabeledIconButton(
+              Padding(
+                padding: const EdgeInsets.all(3.0),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 28,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: widget.parent.data.backgroundColor == Colors.transparent
+                            ? Colors.white24
+                            : widget.parent.data.backgroundColor,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.white),
+                      ),
+                    ),
+                    Text(
+                      "A",
+                      style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+              "Background",
+              active: _currentTool == 4,
+              onTap: () {
+                _setTool(4);
+              },
+            ),
           ],
         );
         final fontSizeSlider = Slider(
@@ -413,11 +455,104 @@ class _TextEditingDialogState extends State<TextEditingDialog> {
           }),
         );
 
+        final backgroundColorPicker = Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: LayoutBuilder(builder: (context, constraints) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    widget.parent.data.backgroundColor == Colors.transparent
+                        ? FilledButton(
+                            onPressed: () {},
+                            child: Text(AppLocalizations.of(context)!.off),
+                          )
+                        : FilledButton.tonal(
+                            onPressed: () {
+                              setState(() {
+                                widget.parent.data.backgroundColor = Colors.transparent;
+                              });
+                            },
+                            child: Text(AppLocalizations.of(context)!.off),
+                          ),
+                  ],
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: colors
+                      .getRange(0, (colors.length / 2).floor())
+                      .map((c) => ColorButton(
+                            c,
+                            size: constraints.maxWidth / 10 - 4,
+                            onTap: () => _setBackgroundColor(c),
+                            active: c == widget.parent.data.backgroundColor,
+                          ))
+                      .toList(),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: colors
+                      .getRange((colors.length / 2).floor() + 1, colors.length)
+                      .map((c) => ColorButton(
+                            size: constraints.maxWidth / 10 - 4,
+                            c,
+                            onTap: () => _setBackgroundColor(c),
+                            active: c == widget.parent.data.backgroundColor,
+                          ))
+                      .toList(),
+                ),
+                Row(
+                  children: [
+                    SizedBox(width: 16),
+                    Text("Padding", style: TextStyle(color: Colors.white)),
+                    Expanded(
+                      child: Slider(
+                        thumbColor: Colors.white,
+                        activeColor: Colors.white,
+                        min: 0,
+                        max: 40,
+                        value: widget.parent.data.backgroundPadding,
+                        onChanged: (value) {
+                          setState(() {
+                            widget.parent.data.backgroundPadding = value;
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    SizedBox(width: 16),
+                    Text("Radius", style: TextStyle(color: Colors.white)),
+                    Expanded(
+                      child: Slider(
+                        thumbColor: Colors.white,
+                        activeColor: Colors.white,
+                        min: 0,
+                        max: 60,
+                        value: widget.parent.data.backgroundRadius,
+                        onChanged: (value) {
+                          setState(() {
+                            widget.parent.data.backgroundRadius = value;
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          }),
+        );
+
         final outlineConfigurator = Column(
           children: [outlineColorPicker, outlineWidthSlider],
         );
 
-        _tools = [fontSelector, fontSizeSlider, textColorPicker, outlineConfigurator];
+        _tools = [fontSelector, fontSizeSlider, textColorPicker, outlineConfigurator, backgroundColorPicker];
 
         final toolbar = Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -475,9 +610,10 @@ class _TextEditingDialogState extends State<TextEditingDialog> {
   }
 
   void _setTool(int tool) {
-    setState(() {});
+    setState(() {
+      _currentTool = tool;
+    });
     HapticFeedback.lightImpact();
-    _currentTool = tool;
   }
 
   void _setTextColor(Color color) async {
@@ -505,6 +641,19 @@ class _TextEditingDialogState extends State<TextEditingDialog> {
       widget.parent.text.outlineColor = color;
     });
   }
+
+  void _setBackgroundColor(Color color) async {
+    if (color == Colors.transparent) {
+      _pickedColor = await showDialog(
+          context: context,
+          builder: (context) => EyedropperDialog(
+              widget.rbKey.currentContext!.findRenderObject() as RenderRepaintBoundary));
+      color = _pickedColor!;
+    }
+    setState(() {
+      widget.parent.data.backgroundColor = color;
+    });
+  }
 }
 
 class LabeledIconButton extends StatelessWidget {
@@ -512,7 +661,7 @@ class LabeledIconButton extends StatelessWidget {
   final String label;
   final bool active;
 
-  final GestureDoubleTapCallback? onTap;
+  final GestureTapCallback? onTap;
 
   const LabeledIconButton(this.icon, this.label, {super.key, this.active = false, this.onTap});
 

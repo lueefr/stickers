@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
@@ -39,6 +40,8 @@ class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateM
   double _btnOpacity = 1;
   bool _ready = false;
   bool _exporting = false;
+  int _rotationDegrees = 0;
+  bool _cropToSquare = true;
   RangeValues _range = RangeValues(0, 1);
   Duration _seekTarget = Duration();
 
@@ -113,9 +116,24 @@ class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateM
                 child: Stack(
                   children: [
                     Center(
-                      child: AspectRatio(
-                        aspectRatio: _controller.value.aspectRatio,
-                        child: VideoPlayer(_controller),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          border: _cropToSquare
+                              ? Border.all(color: Theme.of(context).colorScheme.primary, width: 3)
+                              : null,
+                        ),
+                        width: _cropToSquare ? min(MediaQuery.of(context).size.width, MediaQuery.of(context).size.height) : null,
+                        height: _cropToSquare ? min(MediaQuery.of(context).size.width, MediaQuery.of(context).size.height) : null,
+                        clipBehavior: Clip.antiAlias,
+                        child: Transform.rotate(
+                          angle: _rotationDegrees * pi / 180,
+                          child: AspectRatio(
+                            aspectRatio: _rotationDegrees % 180 == 0
+                                ? _controller.value.aspectRatio
+                                : 1 / _controller.value.aspectRatio,
+                            child: VideoPlayer(_controller),
+                          ),
+                        ),
                       ),
                     ),
                     Center(
@@ -155,6 +173,36 @@ class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateM
               children: [
                 SizedBox(
                   height: 10,
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        tooltip: "Rotate left",
+                        onPressed: () => setState(() {
+                          _rotationDegrees = (_rotationDegrees - 90) % 360;
+                        }),
+                        icon: Icon(Icons.rotate_left),
+                      ),
+                      FilterChip(
+                        selected: _cropToSquare,
+                        label: Text("Square crop"),
+                        avatar: Icon(Icons.crop_square),
+                        onSelected: (value) => setState(() {
+                          _cropToSquare = value;
+                        }),
+                      ),
+                      IconButton(
+                        tooltip: "Rotate right",
+                        onPressed: () => setState(() {
+                          _rotationDegrees = (_rotationDegrees + 90) % 360;
+                        }),
+                        icon: Icon(Icons.rotate_right),
+                      ),
+                    ],
+                  ),
                 ),
                 Stack(
                   children: [
@@ -280,6 +328,8 @@ class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateM
         outputFile: output,
         start: _controller.value.duration * _range.start,
         end: _controller.value.duration * _range.end,
+        rotationDegrees: _rotationDegrees,
+        cropToSquare: _cropToSquare,
       );
       await for (final s in service.progressStream) {
         if (s.status == Status.SUCCESS) {

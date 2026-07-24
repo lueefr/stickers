@@ -6,16 +6,32 @@ import 'package:stickers/src/dialogs/edit_text_dialog.dart';
 import 'package:stickers/src/fonts_api/fonts_registry.dart';
 import 'package:stickers/src/pages/edit_page.dart';
 
-class TextLayer extends StatefulWidget implements EditorLayer {
+class EditorTextLayerData {
+  EditorTextLayerData({
+    required this.text,
+    this.backgroundColor = Colors.transparent,
+    this.backgroundPadding = 10,
+    this.backgroundRadius = 16,
+  });
+
   final EditorText text;
+  Color backgroundColor;
+  double backgroundPadding;
+  double backgroundRadius;
+}
+
+class TextLayer extends StatefulWidget implements EditorLayer {
+  final EditorTextLayerData data;
   TextLayerState? state;
+
+  EditorText get text => data.text;
 
   final Function(TextLayer)? onDelete;
 
   final GlobalKey rbKey;
 
   TextLayer(
-    this.text, {
+    this.data, {
     super.key,
     this.onDelete,
     required this.rbKey,
@@ -40,6 +56,7 @@ class TextLayerState extends State<TextLayer> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    _controller.text = widget.text.text;
     WidgetsBinding.instance.addPostFrameCallback((_) => enableEditing());
   }
 
@@ -71,6 +88,47 @@ class TextLayerState extends State<TextLayer> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    final textStack = Stack(
+      children: [
+        Text(
+          widget.text.text,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            inherit: false,
+            fontSize: widget.text.fontSize * (FontsRegistry.sizeMultiplier(widget.text.fontName) ?? 1),
+            foreground: Paint()
+              ..strokeJoin = StrokeJoin.round
+              ..strokeCap = StrokeCap.round
+              ..color = widget.text.outlineColor
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = widget.text.outlineWidth,
+            fontFamily: widget.text.fontName,
+          ),
+        ),
+        Text(
+          _controller.text,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            inherit: false,
+            fontSize: widget.text.fontSize * (FontsRegistry.sizeMultiplier(widget.text.fontName) ?? 1),
+            color: widget.text.textColor,
+            fontFamily: widget.text.fontName,
+          ),
+        ),
+      ],
+    );
+
+    final textWidget = widget.data.backgroundColor == Colors.transparent
+        ? textStack
+        : Container(
+            padding: EdgeInsets.all(widget.data.backgroundPadding),
+            decoration: BoxDecoration(
+              color: widget.data.backgroundColor,
+              borderRadius: BorderRadius.circular(widget.data.backgroundRadius),
+            ),
+            child: textStack,
+          );
+
     return Transform(
       origin: const Offset(0, 0),
       transform: widget.text.transform,
@@ -80,35 +138,7 @@ class TextLayerState extends State<TextLayer> with TickerProviderStateMixin {
         children: [
           GestureDetector(
             onTap: enableEditing,
-            child: Stack(
-              children: [
-                Text(
-                  widget.text.text,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    inherit: false,
-                    fontSize: widget.text.fontSize * (FontsRegistry.sizeMultiplier(widget.text.fontName) ?? 1),
-                    foreground: Paint()
-                      ..strokeJoin = StrokeJoin.round
-                      ..strokeCap = StrokeCap.round
-                      ..color = widget.text.outlineColor
-                      ..style = PaintingStyle.stroke
-                      ..strokeWidth = widget.text.outlineWidth,
-                    fontFamily: widget.text.fontName,
-                  ),
-                ),
-                Text(
-                  _controller.text,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    inherit: false,
-                    fontSize: widget.text.fontSize * (FontsRegistry.sizeMultiplier(widget.text.fontName) ?? 1),
-                    color: widget.text.textColor,
-                    fontFamily: widget.text.fontName,
-                  ),
-                ),
-              ],
-            ),
+            child: textWidget,
           ),
         ],
       ),

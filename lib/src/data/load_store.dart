@@ -200,7 +200,20 @@ void addToPack(StickerPack pack, int index, Uint8List data) {
   } else {
     output = File("$packsDir/${pack.id}/sticker_${index}_${DateTime.now().millisecondsSinceEpoch}.webp");
     output.writeAsBytesSync(data);
-    pack.stickers.add(Sticker(output.path, ["❤"]));
+    if (index >= 0 && index < pack.stickers.length) {
+      final oldSource = pack.stickers[index].source;
+      pack.stickers[index].source = output.path;
+      try {
+        final oldFile = File(oldSource);
+        if (oldFile.existsSync() && oldFile.path != output.path) {
+          oldFile.deleteSync();
+        }
+      } on FileSystemException catch (_) {
+        // The sticker may point at an imported or shared file that is no longer writable.
+      }
+    } else {
+      pack.stickers.add(Sticker(output.path, ["❤"]));
+    }
   }
   pack.onEdit();
   savePacks(packs);

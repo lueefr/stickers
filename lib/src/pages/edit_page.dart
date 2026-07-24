@@ -1,10 +1,12 @@
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:image_editor/image_editor.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:matrix_gesture_detector/matrix_gesture_detector.dart';
 import 'package:stickers/generated/intl/app_localizations.dart';
 import 'package:stickers/src/checker_painter.dart';
@@ -15,13 +17,13 @@ import 'package:stickers/src/dialogs/confirm_leave_dialog.dart';
 import 'package:stickers/src/dialogs/edit_text_dialog.dart';
 import 'package:stickers/src/dialogs/error_dialog.dart';
 import 'package:stickers/src/dialogs/eyedropper_dialog.dart';
-import 'package:stickers/src/fonts_api/fonts_registry.dart';
 import 'package:stickers/src/globals.dart';
 import 'package:stickers/src/pages/crop_page.dart';
 import 'package:stickers/src/pages/default_page.dart';
 import 'package:stickers/src/video/common.dart';
 import 'package:stickers/src/video/overlay_encode.dart';
 import 'package:stickers/src/widgets/draw_layer.dart';
+import 'package:stickers/src/widgets/image_layer.dart';
 import 'package:stickers/src/widgets/text_layer.dart';
 import 'package:vector_math/vector_math_64.dart' hide Colors;
 import 'package:video_player/video_player.dart';
@@ -32,11 +34,12 @@ class EditPage extends StatefulWidget {
   final StickerPack pack;
   final int index;
 
-  const EditPage(this.pack, this.index, this.imagePath, this.mediaType, {super.key});
+  const EditPage(this.pack, this.index, this.imagePath, this.mediaType, {super.key, this.popCount = 2});
 
   static const routeName = "/edit";
 
   final MediaType mediaType;
+  final int popCount;
 
   @override
   State<EditPage> createState() => _EditPageState();
@@ -58,10 +61,9 @@ class _EditPageState extends State<EditPage> {
 
   /// The sticker is 512x512 as opposed to the canvas, which is why we need a scale factor
   double scaleFactor = 0;
-  final List<EditorText> _texts = [];
   final List<EditorLayer> _layers = [];
 
-  TextLayer? _currentTextLayer;
+  Object? _currentTransformLayer;
 
   @override
   void initState() {
@@ -84,6 +86,7 @@ class _EditPageState extends State<EditPage> {
   }
 
   final GlobalKey _rbKey = GlobalKey();
+  final GlobalKey _overlayKey = GlobalKey();
   bool _exporting = false;
   late VideoPlayerController _controller;
 
@@ -229,21 +232,22 @@ class _EditPageState extends State<EditPage> {
                     child: FilledButton.tonalIcon(
                       onPressed: () {
                         _drawing = false;
-                        EditorText text = EditorText(
-                          outlineWidth: 10,
-                          outlineColor: Colors.transparent,
-                          text: "",
-                          transform: Matrix4.identity(),
-                          fontSize: 40,
-                          textColor: Colors.white,
+                        final text = EditorTextLayerData(
+                          text: EditorText(
+                            outlineWidth: 10,
+                            outlineColor: Colors.transparent,
+                            text: "",
+                            transform: Matrix4.identity(),
+                            fontSize: 40,
+                            textColor: Colors.white,
+                          ),
                         );
-                        _texts.add(text);
                         _layers.add(TextLayer(
                           text,
                           rbKey: _rbKey,
                           onDelete: (layer) {
                             _layers.remove(layer);
-                            if (_currentTextLayer == layer) _currentTextLayer = null;
+                            if (_currentTransformLayer == layer) _currentTransformLayer = null;
                             setState(() {});
                           },
                         ));
@@ -252,6 +256,14 @@ class _EditPageState extends State<EditPage> {
                       },
                       label: Text(AppLocalizations.of(context)!.addText),
                       icon: Icon(Icons.format_size),
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton.tonalIcon(
+                      onPressed: _addImageLayer,
+                      label: Text("Add image"),
+                      icon: Icon(Icons.add_photo_alternate),
                     ),
                   ),
                   SizedBox(width: 12),
@@ -305,13 +317,23 @@ class _EditPageState extends State<EditPage> {
                                     child: VideoPlayer(_controller),
                                   ),
                                 ),
-                              ..._layers.map(
-                                (e) => Positioned(
-                                  top: 0,
-                                  bottom: 0,
-                                  left: 0,
-                                  right: 0,
-                                  child: e,
+                              Positioned.fill(
+                                child: RepaintBoundary(
+                                  key: _overlayKey,
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: _layers
+                                        .map(
+                                          (e) => Positioned(
+                                            top: 0,
+                                            bottom: 0,
+                                            left: 0,
+                                            right: 0,
+                                            child: e,
+                                          ),
+                                        )
+                                        .toList(),
+                                  ),
                                 ),
                               ),
                               if (_message != null)
@@ -490,38 +512,28 @@ class _EditPageState extends State<EditPage> {
       _exporting = true;
     });
     try {
+      final overlay = await _renderOverlay();
       final option = ImageEditorOption();
-      for (EditorLayer layer in _layers) {
-        final Option layerOption;
-        if (layer is TextLayer) {
-          layerOption = AddTextOption();
-          final transform = layer.text.transform.storage;
-          transform[12] = transform[12] / scaleFactor;
-          transform[13] = transform[13] / scaleFactor;
-          layer.text.fontSize /= scaleFactor;
-          layer.text.outlineWidth /= scaleFactor;
-          layer.text.fontSize *= FontsRegistry.sizeMultiplier(layer.text.fontName) ?? 1;
-          (layerOption as AddTextOption).addText(layer.text);
-        } else if (layer is DrawLayer) {
-          layerOption = layer.drawOption;
-        } else {
-          throw UnimplementedError();
-        }
-        option.addOption(layerOption);
-      }
-
+      option.addOption(MixImageOption(
+        target: MemoryImageSource(overlay),
+        x: 0,
+        y: 0,
+        width: 512,
+        height: 512,
+      ));
       option.outputFormat = const OutputFormat.webp_lossy();
 
       final Uint8List data;
       if (widget.mediaType == MediaType.picture) {
         data = (await ImageEditor.editFileImage(file: _source, imageEditorOption: option))!;
       } else {
-        data = await exportAnimatedSticker(option, context);
+        data = await exportAnimatedSticker(overlay, context);
       }
       addToPack(widget.pack, widget.index, data);
       if (!context.mounted) return;
-      Navigator.of(context).pop();
-      Navigator.of(context).pop();
+      for (var i = 0; i < widget.popCount && Navigator.of(context).canPop(); i++) {
+        Navigator.of(context).pop();
+      }
     } on Exception catch (e) {
       if (mounted) {
         showDialog(
@@ -534,26 +546,27 @@ class _EditPageState extends State<EditPage> {
             });
       }
     } finally {
-      //This is useless if the screen goes away but useful for debugging
-      for (EditorText text in _texts) {
-        final transform = text.transform.storage;
-        transform[12] = transform[12] * scaleFactor;
-        transform[13] = transform[13] * scaleFactor;
-        text.fontSize *= scaleFactor;
-        text.outlineWidth *= scaleFactor;
-        text.fontSize /= FontsRegistry.sizeMultiplier(text.fontName) ?? 1;
+      if (mounted) {
+        setState(() {
+          _exporting = false;
+        });
       }
-      setState(() {
-        _exporting = false;
-      });
     }
     return;
   }
 
-  Future<Uint8List> exportAnimatedSticker(ImageEditorOption option, BuildContext context) async {
-    final transparent = await rootBundle.load("assets/transparent.webp");
-    final out =
-        await ImageEditor.editImageAndGetFile(image: transparent.buffer.asUint8List(), imageEditorOption: option);
+  Future<Uint8List> _renderOverlay() async {
+    await WidgetsBinding.instance.endOfFrame;
+    final boundary = _overlayKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+    final pixelRatio = 512 / boundary.size.width;
+    final image = await boundary.toImage(pixelRatio: pixelRatio);
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    return byteData!.buffer.asUint8List();
+  }
+
+  Future<Uint8List> exportAnimatedSticker(Uint8List overlayPng, BuildContext context) async {
+    final overlayOption = ImageEditorOption()..outputFormat = const OutputFormat.webp_lossless();
+    final out = await ImageEditor.editImageAndGetFile(image: overlayPng, imageEditorOption: overlayOption);
     final service = OverlayAndEncodeService();
     final output = File("$mediaCacheDir/exported_${DateTime.now().millisecondsSinceEpoch}.webp");
     Stopwatch sw = Stopwatch()..start();
@@ -649,13 +662,16 @@ class _EditPageState extends State<EditPage> {
       return;
     }
 
-    if (_currentTextLayer == null) return;
-    // If we just use matrix here it breaks when switching between layers
-    var newTransform = _currentTextLayer!.text.transform;
+    final layer = _currentTransformLayer;
+    final transform = _transformOf(layer);
+    if (transform == null) return;
+
+    // If we just use matrix here it breaks when switching between layers.
+    var newTransform = transform;
     newTransform = translationDeltaMatrix * newTransform;
     newTransform = scaleDeltaMatrix * newTransform;
     newTransform = rotationDeltaMatrix * newTransform;
-    _currentTextLayer!.update(newTransform);
+    _updateLayer(layer, newTransform);
     return;
   }
 
@@ -673,17 +689,56 @@ class _EditPageState extends State<EditPage> {
       return;
     }
     double minDistance = double.infinity;
-    for (final TextLayer layer in _layers.whereType<TextLayer>()) {
+    _currentTransformLayer = null;
+    for (final layer in _layers) {
+      final transform = _transformOf(layer);
+      if (transform == null) continue;
       Vector4 center = Vector4(scaleFactor * 256, scaleFactor * 256, 1, 1);
-      center.applyMatrix4(layer.text.transform);
+      center.applyMatrix4(transform);
       Offset position = Offset(center.x, center.y);
       Offset delta = position - focalPoint;
       if (minDistance > delta.distanceSquared) {
         minDistance = delta.distanceSquared;
-        _currentTextLayer = layer;
+        _currentTransformLayer = layer;
       }
     }
     return;
+  }
+
+  Matrix4? _transformOf(Object? layer) {
+    if (layer is TextLayer) return layer.text.transform;
+    if (layer is ImageStickerLayer) return layer.image.transform;
+    return null;
+  }
+
+  void _updateLayer(Object? layer, Matrix4 transform) {
+    if (layer is TextLayer) {
+      layer.update(transform);
+    } else if (layer is ImageStickerLayer) {
+      layer.update(transform);
+    }
+  }
+
+  Future<void> _addImageLayer() async {
+    setState(() {
+      _drawing = false;
+    });
+    final image = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (image == null) return;
+    final layer = ImageStickerLayer(
+      EditorImageLayerData(
+        source: image.path,
+        transform: Matrix4.identity(),
+      ),
+      onDelete: (layer) {
+        _layers.remove(layer);
+        if (_currentTransformLayer == layer) _currentTransformLayer = null;
+        setState(() {});
+      },
+    );
+    _layers.add(layer);
+    _currentTransformLayer = layer;
+    setState(() {});
   }
 
   void _setColor(Color c) async {
