@@ -1,5 +1,8 @@
 import 'dart:io';
+import 'dart:math';
+import 'dart:typed_data';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:stickers/generated/intl/app_localizations.dart';
@@ -11,9 +14,11 @@ import 'package:stickers/src/dialogs/delete_confirm_dialog.dart';
 import 'package:stickers/src/dialogs/edit_pack_dialog.dart';
 import 'package:stickers/src/dialogs/edit_sticker_dialog.dart';
 import 'package:stickers/src/dialogs/error_dialog.dart';
+import 'package:stickers/src/dialogs/select_sticker_dialog.dart';
 import 'package:stickers/src/globals.dart';
 import 'package:stickers/src/pages/crop_page.dart';
 import 'package:stickers/src/pages/default_page.dart';
+import 'package:stickers/src/video/gif_to_webp.dart';
 import 'package:stickers/src/util.dart';
 
 class StickerPackPage extends StatefulWidget {
@@ -122,11 +127,27 @@ class StickerPackPageState extends State<StickerPackPage> {
                                 child: GestureDetector(
                                   child: Image.file(File(widget.pack.stickers[index].source)),
                                   onTap: () {
-                                    showDialog(
+                                    showDialog<String>(
                                       context: context,
                                       builder: ((context) => EditStickerDialog(widget.pack, index)),
                                     ).then(
-                                      (_) => setState(() {}),
+                                      (action) {
+                                        if (action == "edit") {
+                                          Navigator.of(context)
+                                              .pushNamed(
+                                                "/edit",
+                                                arguments: EditArguments(
+                                                  pack: widget.pack,
+                                                  index: index,
+                                                  mediaPath: widget.pack.stickers[index].source,
+                                                  popCount: 1,
+                                                ),
+                                              )
+                                              .then((_) => setState(() {}));
+                                        } else {
+                                          setState(() {});
+                                        }
+                                      },
                                     );
                                   },
                                 ),
@@ -192,46 +213,247 @@ class StickerPackPageState extends State<StickerPackPage> {
   }
 
   Future<void> _createSticker(int index) async {
+    if (widget.pack.animated) {
+      await _showAnimatedStickerOptions(index);
+    } else {
+      await _showStaticStickerOptions(index);
+    }
+  }
+
+  Future<void> _showStaticStickerOptions(int index) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.photo),
+              title: Text("New image"),
+              onTap: () {
+                Navigator.of(context).pop();
+                _pickAndEditSingleImage(index);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.collections),
+              title: Text("Multiple images"),
+              subtitle: Text("Edit them one at a time"),
+              onTap: () {
+                Navigator.of(context).pop();
+                _pickAndEditMultipleImages();
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.auto_fix_high),
+              title: Text("Start with existing sticker"),
+              onTap: () {
+                Navigator.of(context).pop();
+                _startWithExistingSticker();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showAnimatedStickerOptions(int index) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.video_library),
+              title: Text("Video"),
+              subtitle: Text("Trim, crop and rotate"),
+              onTap: () {
+                Navigator.of(context).pop();
+                _pickAndEditVideo(index);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.gif_box),
+              title: Text("GIF"),
+              subtitle: Text("Create an animated sticker from a GIF"),
+              onTap: () {
+                Navigator.of(context).pop();
+                _pickGif(index);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickAndEditSingleImage(int index) async {
     try {
       final ImagePicker picker = ImagePicker();
-      if (widget.pack.animated) {
-        final XFile? video = await picker.pickVideo(source: ImageSource.gallery);
-        if (video == null) return;
+      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+      if (image == null) return;
+      if (!mounted) return;
+      Navigator.pushNamed(
+        context,
+        "/crop",
+        arguments: EditArguments(
+          pack: widget.pack,
+          index: index,
+          mediaPath: image.path,
+        ),
+      ).then((value) => setState(() {}));
+    } on Exception catch (e) {
+      _showLoadError(e);
+    }
+  }
+
+  Future<void> _pickAndEditMultipleImages() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final images = await picker.pickMultiImage();
+      if (images.isEmpty) return;
+      for (final image in images) {
         if (!mounted) return;
-        Navigator.pushNamed(
-          context,
-          "/crop_video",
-          arguments: EditArguments(
-            pack: widget.pack,
-            index: index,
-            mediaPath: video.path,
-          ),
-        ).then((value) => setState(() {}));
-      } else {
-        final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-        if (image == null) return; //TODO add Snackbar warning
-        if (!mounted) return;
-        Navigator.pushNamed(
+        if (widget.pack.stickers.length >= 30) break;
+        await Navigator.pushNamed(
           context,
           "/crop",
           arguments: EditArguments(
             pack: widget.pack,
-            index: index,
+            index: widget.pack.stickers.length,
             mediaPath: image.path,
           ),
-        ).then((value) => setState(() {}));
+        );
+        if (mounted) setState(() {});
       }
     } on Exception catch (e) {
-      if (mounted) {
-        showDialog(
-            context: context,
-            builder: (context) {
-              return ErrorDialog(
-                title: AppLocalizations.of(context)!.couldntLoadMedia,
-                message: e.toString(),
-              );
-            });
-      }
+      _showLoadError(e);
     }
   }
+
+  Future<void> _startWithExistingSticker() async {
+    showDialog(
+      context: context,
+      builder: (_) => SelectStickerDialog(callback: (sticker) {
+        Future.microtask(() {
+          if (!mounted || widget.pack.stickers.length >= 30) return;
+          Navigator.of(context)
+              .pushNamed(
+                "/edit",
+                arguments: EditArguments(
+                  pack: widget.pack,
+                  index: widget.pack.stickers.length,
+                  mediaPath: sticker.source,
+                  popCount: 1,
+                ),
+              )
+              .then((_) => setState(() {}));
+        });
+      }),
+    );
+  }
+
+  Future<void> _pickAndEditVideo(int index) async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? video = await picker.pickVideo(source: ImageSource.gallery);
+      if (video == null) return;
+      if (!mounted) return;
+      Navigator.pushNamed(
+        context,
+        "/crop_video",
+        arguments: EditArguments(
+          pack: widget.pack,
+          index: index,
+          mediaPath: video.path,
+        ),
+      ).then((value) => setState(() {}));
+    } on Exception catch (e) {
+      _showLoadError(e);
+    }
+  }
+
+  Future<void> _pickGif(int index) async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ["gif"],
+        allowMultiple: false,
+      );
+      if (result == null || result.files.single.path == null) return;
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 20),
+              Expanded(child: Text("Creating animated sticker...")),
+            ],
+          ),
+        ),
+      );
+      final service = GifToWebPService();
+      Uint8List? best;
+      double quality = 60;
+      int fps = 12;
+      for (var attempt = 0; attempt < 3; attempt++) {
+        final output = "$mediaCacheDir/gif_${DateTime.now().millisecondsSinceEpoch}_$attempt.webp";
+        await service.convert(
+          inputFile: result.files.single.path!,
+          outputFile: output,
+          quality: quality,
+          fps: fps,
+        );
+        final data = await File(output).readAsBytes();
+        best = data;
+        if (data.lengthInBytes / 1024 < 500) break;
+        quality -= 20;
+        fps = max<int>(6, (fps * .75).round());
+      }
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      if (best == null) return;
+      if (best.lengthInBytes / 1024 > 500) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(AppLocalizations.of(context)!.stickerTooLarge),
+            content: Text(AppLocalizations.of(context)!.stickerTooLargeMsg),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(AppLocalizations.of(context)!.ok)),
+            ],
+          ),
+        );
+        return;
+      }
+      addToPack(widget.pack, index, best);
+      setState(() {});
+    } on Exception catch (e) {
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+      _showLoadError(e);
+    }
+  }
+
+  void _showLoadError(Object e) {
+    if (mounted) {
+      showDialog(
+          context: context,
+          builder: (context) {
+            return ErrorDialog(
+              title: AppLocalizations.of(context)!.couldntLoadMedia,
+              message: e.toString(),
+            );
+          });
+    }
+  }
+
 }

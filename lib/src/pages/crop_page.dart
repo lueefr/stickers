@@ -127,16 +127,62 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     IconButton(
+                      tooltip: "Undo",
+                      onPressed: () {
+                        _editorController.undo();
+                        setState(() {});
+                      },
+                      icon: Icon(Icons.undo),
+                    ),
+                    IconButton(
+                      tooltip: "Rotate left",
                       onPressed: () {
                         _editorController.rotate(degree: -90, animation: true);
+                        setState(() {});
                       },
                       icon: Icon(Icons.rotate_left),
                     ),
                     IconButton(
+                      tooltip: "Rotate -1°",
+                      onPressed: () {
+                        _editorController.rotate(degree: -1, animation: true, rotateCropRect: false);
+                        setState(() {});
+                      },
+                      icon: Icon(Icons.rotate_90_degrees_ccw),
+                    ),
+                    IconButton(
+                      tooltip: "Rotate +1°",
+                      onPressed: () {
+                        _editorController.rotate(degree: 1, animation: true, rotateCropRect: false);
+                        setState(() {});
+                      },
+                      icon: Icon(Icons.rotate_90_degrees_cw),
+                    ),
+                    IconButton(
+                      tooltip: "Rotate right",
                       onPressed: () {
                         _editorController.rotate(degree: 90, animation: true);
+                        setState(() {});
                       },
                       icon: Icon(Icons.rotate_right),
+                    ),
+                    IconButton(
+                      tooltip: "Flip",
+                      onPressed: () {
+                        _editorController.flip(animation: true);
+                        setState(() {});
+                      },
+                      icon: Icon(Icons.flip),
+                    ),
+                    IconButton(
+                      tooltip: "Reset",
+                      onPressed: () {
+                        _editorController.reset();
+                        setState(() {
+                          _aspectRatio = null;
+                        });
+                      },
+                      icon: Icon(Icons.restart_alt),
                     ),
                   ],
                 ),
@@ -148,6 +194,15 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
                     emptySelectionAllowed: true,
                     multiSelectionEnabled: false,
                     segments: [
+                      ButtonSegment(
+                          value: 0,
+                          icon: Column(children: [
+                            Icon(Icons.crop_free),
+                            Text(
+                              "Free",
+                              style: TextStyle(fontSize: 10),
+                            )
+                          ])),
                       ButtonSegment(
                           value: 16 / 9,
                           icon: Column(children: [
@@ -203,7 +258,9 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
                     selected: {_aspectRatio == null ? 0 : _aspectRatio!},
                     onSelectionChanged: (v) {
                       setState(() {
-                        _aspectRatio = v.firstOrNull;
+                        final selected = v.firstOrNull;
+                        _aspectRatio = selected == 0 ? null : selected;
+                        _editorController.updateCropAspectRatio(_aspectRatio);
                         HapticFeedback.lightImpact();
                       });
                     },
@@ -279,9 +336,15 @@ class EditArguments {
   String mediaPath;
   MediaType type;
 
-  EditArguments(
-      {required this.pack,
-      required this.index,
-      required this.mediaPath,
-      this.type = MediaType.picture});
+  /// Number of pages the editor should close after saving.
+  /// Cropped media closes both the editor and crop page; direct editing closes only the editor.
+  int popCount;
+
+  EditArguments({
+    required this.pack,
+    required this.index,
+    required this.mediaPath,
+    this.type = MediaType.picture,
+    this.popCount = 2,
+  });
 }

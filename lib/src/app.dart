@@ -158,7 +158,7 @@ class StickersAppState extends State<StickersApp> {
                     );
                   case EditPage.routeName:
                     final args = routeSettings.arguments as EditArguments;
-                    return EditPage(args.pack, args.index, args.mediaPath, args.type);
+                    return EditPage(args.pack, args.index, args.mediaPath, args.type, popCount: args.popCount);
                   case StickerPackPage.routeName:
                     return StickerPackPage(routeSettings.arguments as StickerPack, () {
                       setState(() {});

@@ -20,12 +20,14 @@ class CropScaleGL : SurfaceTexture.OnFrameAvailableListener {
     private var positionHandle = 0
     private var texCoordHandle = 0
     private var transformMatrixHandle = 0
+    private var positionMatrixHandle = 0
 
     private var videoTextureHandle = 0
 
     private val vertexBuffer: FloatBuffer
     private val texCoordBuffer: FloatBuffer
     private val transformMatrix = FloatArray(16)
+    private val positionMatrix = FloatArray(16)
 
     private lateinit var decoderSurfaceTexture: SurfaceTexture
     lateinit var decoderInputSurface: Surface
@@ -44,15 +46,26 @@ class CropScaleGL : SurfaceTexture.OnFrameAvailableListener {
         val texCoordData = floatArrayOf(0f, 0f, 1f, 0f, 0f, 1f, 1f, 1f)
         texCoordBuffer = ByteBuffer.allocateDirect(texCoordData.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
         texCoordBuffer.put(texCoordData).position(0)
+        Matrix.setIdentityM(positionMatrix, 0)
     }
 
     override fun onFrameAvailable(st: SurfaceTexture?) {
         frameSemaphore.release()
     }
 
-    fun setup(encoderSurface: Surface, width: Int, height: Int) {
+    fun setup(
+        encoderSurface: Surface,
+        width: Int,
+        height: Int,
+        sourceWidth: Int,
+        sourceHeight: Int,
+        rotationDegrees: Int,
+        cropToSquare: Boolean
+    ) {
         this.targetWidth = width
         this.targetHeight = height
+        configureTextureCoordinates(sourceWidth, sourceHeight, rotationDegrees, cropToSquare)
+        Matrix.setRotateM(positionMatrix, 0, rotationDegrees.toFloat(), 0f, 0f, 1f)
 
         eglDisplay = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
         val version = IntArray(2)
@@ -71,6 +84,7 @@ class CropScaleGL : SurfaceTexture.OnFrameAvailableListener {
         positionHandle = GLES20.glGetAttribLocation(programHandle, "aPosition")
         texCoordHandle = GLES20.glGetAttribLocation(programHandle, "aTexCoord")
         transformMatrixHandle = GLES20.glGetUniformLocation(programHandle, "uTransformMatrix")
+        positionMatrixHandle = GLES20.glGetUniformLocation(programHandle, "uPositionMatrix")
 
         val textures = IntArray(1)
         GLES20.glGenTextures(1, textures, 0)
@@ -82,6 +96,32 @@ class CropScaleGL : SurfaceTexture.OnFrameAvailableListener {
         decoderSurfaceTexture = SurfaceTexture(videoTextureHandle)
         decoderSurfaceTexture.setOnFrameAvailableListener(this)
         decoderInputSurface = Surface(decoderSurfaceTexture)
+    }
+
+
+    private fun configureTextureCoordinates(sourceWidth: Int, sourceHeight: Int, rotationDegrees: Int, cropToSquare: Boolean) {
+        var left = 0f
+        var right = 1f
+        var top = 0f
+        var bottom = 1f
+        if (cropToSquare) {
+            val normalizedRotation = ((rotationDegrees % 180) + 180) % 180
+            val rotatedWidth = if (normalizedRotation == 90) sourceHeight else sourceWidth
+            val rotatedHeight = if (normalizedRotation == 90) sourceWidth else sourceHeight
+            val aspect = rotatedWidth.toFloat() / rotatedHeight.toFloat()
+            if (aspect > 1f) {
+                val inset = (1f - 1f / aspect) / 2f
+                left = inset
+                right = 1f - inset
+            } else if (aspect < 1f) {
+                val inset = (1f - aspect) / 2f
+                top = inset
+                bottom = 1f - inset
+            }
+        }
+        val texCoordData = floatArrayOf(left, top, right, top, left, bottom, right, bottom)
+        texCoordBuffer.position(0)
+        texCoordBuffer.put(texCoordData).position(0)
     }
 
     fun awaitNewFrame() {
@@ -102,6 +142,7 @@ class CropScaleGL : SurfaceTexture.OnFrameAvailableListener {
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, videoTextureHandle)
         GLES20.glUniformMatrix4fv(transformMatrixHandle, 1, false, transformMatrix, 0)
+        GLES20.glUniformMatrix4fv(positionMatrixHandle, 1, false, positionMatrix, 0)
         GLES20.glEnableVertexAttribArray(positionHandle)
         GLES20.glVertexAttribPointer(positionHandle, 2, GLES20.GL_FLOAT, false, 8, vertexBuffer)
         GLES20.glEnableVertexAttribArray(texCoordHandle)
@@ -142,11 +183,12 @@ class CropScaleGL : SurfaceTexture.OnFrameAvailableListener {
 
     private val VERTEX_SHADER = """
         uniform mat4 uTransformMatrix;
+        uniform mat4 uPositionMatrix;
         attribute vec4 aPosition;
         attribute vec2 aTexCoord;
         varying vec2 vTexCoord;
         void main() {
-            gl_Position = aPosition;
+            gl_Position = uPositionMatrix * aPosition;
             vTexCoord = (uTransformMatrix * vec4(aTexCoord, 0.0, 1.0)).xy;
         }
     """.trimIndent()

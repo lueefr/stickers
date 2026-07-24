@@ -4,6 +4,7 @@ import android.os.Build
 import androidx.annotation.NonNull
 import androidx.annotation.RequiresApi
 import de.loicezt.stickers.video.CropAndScale
+import de.loicezt.stickers.video.GifToWebP
 import de.loicezt.stickers.video.OverlayAndEncode
 import de.loicezt.stickers.video.WebPConfig
 import io.flutter.embedding.android.FlutterActivity
@@ -25,6 +26,7 @@ class MainActivity : FlutterActivity() {
 
     private lateinit var cropAndScale: CropAndScale
     private lateinit var overlayAndEncode: OverlayAndEncode
+    private lateinit var gifToWebP: GifToWebP
     private val scope = CoroutineScope(
         Dispatchers.Main + SupervisorJob()
     )
@@ -34,6 +36,7 @@ class MainActivity : FlutterActivity() {
 
         cropAndScale = CropAndScale()
         overlayAndEncode = OverlayAndEncode()
+        gifToWebP = GifToWebP()
 
         // 1. Setup the MethodChannel to receive commands from Flutter
         MethodChannel(
@@ -47,8 +50,28 @@ class MainActivity : FlutterActivity() {
                     val outputFile = File(args["outputFile"]!!)
                     val startTimeUs = args["startTimeUs"]!!.toLong()
                     val endTimeUs = args["endTimeUs"]!!.toLong()
-                    cropAndScale.start(inputFile, outputFile, startTimeUs, endTimeUs, 24)
+                    val rotationDegrees = args["rotationDegrees"]?.toInt() ?: 0
+                    val cropToSquare = args["cropToSquare"]?.toBooleanStrictOrNull() ?: true
+                    cropAndScale.start(inputFile, outputFile, startTimeUs, endTimeUs, 24, rotationDegrees, cropToSquare)
                     result.success(null)
+                }
+
+                "convertGif" -> {
+                    val args = call.arguments as? Map<*, *>
+                    if (args == null) {
+                        result.error("INVALID_ARGUMENTS", "Arguments must be a map", null)
+                        return@setMethodCallHandler
+                    }
+                    try {
+                        val inputFile = File(args["inputFile"]!! as String)
+                        val outputFile = File(args["outputFile"]!! as String)
+                        val fps = args["fps"]!! as Int
+                        val config = WebPConfig.fromMap(args["config"]!! as Map<*, *>)
+                        gifToWebP.convert(inputFile, outputFile, config, fps)
+                        result.success(null)
+                    } catch (e: Exception) {
+                        result.error("GIF_CONVERT_FAILED", e.message, null)
+                    }
                 }
 
                 "startOverlay" -> {

@@ -73,7 +73,9 @@ class CropAndScale {
         outputFile: File,
         startTimeUs: Long,
         endTimeUs: Long,
-        maxFps: Int
+        maxFps: Int,
+        rotationDegrees: Int = 0,
+        cropToSquare: Boolean = true
     ) {
         if (_status.value == State.RUNNING) {
             Log.w(LOG_TAG, "Transcoding is already in progress. Ignoring new request.")
@@ -84,7 +86,7 @@ class CropAndScale {
             _status.value = State.RUNNING
             _progress.value = ProgressState()
             try {
-                doTranscode(inputFile, outputFile, startTimeUs, endTimeUs, maxFps)
+                doTranscode(inputFile, outputFile, startTimeUs, endTimeUs, maxFps, rotationDegrees, cropToSquare)
                 _status.value = State.SUCCESS
                 Log.d(LOG_TAG, "Transcoding finished successfully.")
             } catch (e: CancellationException) {
@@ -120,7 +122,9 @@ class CropAndScale {
         outputFile: File,
         startTimeUs: Long,
         endTimeUs: Long,
-        maxFps: Int
+        maxFps: Int,
+        rotationDegrees: Int = 0,
+        cropToSquare: Boolean = true
     ) {
         val extractor = MediaExtractor()
         var decoder: MediaCodec? = null
@@ -164,15 +168,16 @@ class CropAndScale {
             val totalFrames = ((trimmedDurationUs / 1_000_000.0) * targetFrameRate).toInt()
             _progress.value = ProgressState(totalFrames = totalFrames)
 
-            val rotation = if (inputFormat.containsKey(MediaFormat.KEY_ROTATION)) {
+            val metadataRotation = if (inputFormat.containsKey(MediaFormat.KEY_ROTATION)) {
                 inputFormat.getInteger(MediaFormat.KEY_ROTATION)
             } else {
                 0
             }
+            val totalRotation = ((metadataRotation + rotationDegrees) % 360 + 360) % 360
 
             val rotatedWidth: Int
             val rotatedHeight: Int
-            if (rotation == 90 || rotation == 270) {
+            if (totalRotation == 90 || totalRotation == 270) {
                 rotatedWidth = videoHeight
                 rotatedHeight = videoWidth
             } else {
@@ -182,7 +187,10 @@ class CropAndScale {
 
             val outputWidth: Int
             val outputHeight: Int
-            if (rotatedWidth > rotatedHeight) {
+            if (cropToSquare) {
+                outputWidth = TARGET_LONGEST_SIDE
+                outputHeight = TARGET_LONGEST_SIDE
+            } else if (rotatedWidth > rotatedHeight) {
                 outputWidth = TARGET_LONGEST_SIDE
                 outputHeight =
                     (TARGET_LONGEST_SIDE * (rotatedHeight.toFloat() / rotatedWidth.toFloat())).toInt()
@@ -211,7 +219,15 @@ class CropAndScale {
             val encoderInputSurface = encoder.createInputSurface()
             encoder.start()
 
-            glProcessor.setup(encoderInputSurface, finalOutputWidth, finalOutputHeight)
+            glProcessor.setup(
+                encoderInputSurface,
+                finalOutputWidth,
+                finalOutputHeight,
+                videoWidth,
+                videoHeight,
+                totalRotation,
+                cropToSquare
+            )
             decoder = MediaCodec.createDecoderByType(inputFormat.getString(MediaFormat.KEY_MIME)!!)
             decoder.configure(inputFormat, glProcessor.decoderInputSurface, null, 0)
             decoder.start()

@@ -5,10 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:stickers/generated/intl/app_localizations.dart';
 import 'package:stickers/src/constants.dart';
 import 'package:stickers/src/data/load_store.dart';
+import 'package:stickers/src/data/sticker_pack.dart';
 import 'package:stickers/src/dialogs/create_pack_dialog.dart';
 import 'package:stickers/src/dialogs/error_dialog.dart';
 import 'package:stickers/src/globals.dart';
 import 'package:stickers/src/pages/default_page.dart';
+import 'package:stickers/src/util.dart';
 import 'package:stickers/src/widgets/sticker_pack_preview_card.dart';
 
 class StickerPacksPage extends StatefulWidget {
@@ -21,6 +23,10 @@ class StickerPacksPage extends StatefulWidget {
 }
 
 class StickerPacksPageState extends State<StickerPacksPage> {
+  final Set<StickerPack> _selectedPacks = <StickerPack>{};
+
+  bool get _selectionMode => _selectedPacks.isNotEmpty;
+
   @override
   initState() {
     super.initState();
@@ -35,15 +41,62 @@ class StickerPacksPageState extends State<StickerPacksPage> {
   @override
   Widget build(BuildContext context) {
     return DefaultSliverActivity(
-      actions: [
-        IconButton(
-          tooltip: AppLocalizations.of(context)!.settings,
-          onPressed: () {
-            Navigator.of(context).pushNamed("/settings");
-          },
-          icon: const Icon(Icons.settings),
-        )
-      ],
+      leading: _selectionMode
+          ? IconButton(
+              tooltip: AppLocalizations.of(context)!.cancel,
+              onPressed: () {
+                setState(() => _selectedPacks.clear());
+              },
+              icon: const Icon(Icons.close),
+            )
+          : null,
+      actions: _selectionMode
+          ? [
+              IconButton(
+                tooltip: "Select all",
+                onPressed: () {
+                  setState(() {
+                    _selectedPacks
+                      ..clear()
+                      ..addAll(packs);
+                  });
+                },
+                icon: const Icon(Icons.select_all),
+              ),
+              IconButton(
+                tooltip: AppLocalizations.of(context)!.addToWhatsapp,
+                onPressed: _sendSelectedToWhatsapp,
+                icon: const Icon(Icons.send),
+              ),
+              IconButton(
+                tooltip: AppLocalizations.of(context)!.export,
+                onPressed: _exportSelected,
+                icon: const Icon(Icons.share),
+              ),
+              IconButton(
+                tooltip: AppLocalizations.of(context)!.delete,
+                onPressed: _deleteSelected,
+                icon: const Icon(Icons.delete),
+              ),
+            ]
+          : [
+              IconButton(
+                tooltip: "Select packs",
+                onPressed: () {
+                  if (packs.isNotEmpty) {
+                    setState(() => _selectedPacks.add(packs.first));
+                  }
+                },
+                icon: const Icon(Icons.checklist),
+              ),
+              IconButton(
+                tooltip: AppLocalizations.of(context)!.settings,
+                onPressed: () {
+                  Navigator.of(context).pushNamed("/settings");
+                },
+                icon: const Icon(Icons.settings),
+              )
+            ],
       fab: Row(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -99,7 +152,9 @@ class StickerPacksPageState extends State<StickerPacksPage> {
           ),
         ],
       ),
-      title: AppLocalizations.of(context)?.pTitle ?? localizationUnavailable,
+      title: _selectionMode
+          ? "${_selectedPacks.length} selected"
+          : AppLocalizations.of(context)?.pTitle ?? localizationUnavailable,
       child: packs.isEmpty
           ? Padding(
               padding: const EdgeInsets.fromLTRB(8, 36, 8, 0),
@@ -122,11 +177,69 @@ class StickerPacksPageState extends State<StickerPacksPage> {
             )
           : ListView.separated(
               separatorBuilder: (context, index) => Container(),
-              itemBuilder: (context, index) => StickerPackPreviewCard(packs[index], () {
-                setState(() {});
-              }),
+              itemBuilder: (context, index) => StickerPackPreviewCard(
+                packs[index],
+                () {
+                  _selectedPacks.remove(packs[index]);
+                  setState(() {});
+                },
+                selectionMode: _selectionMode,
+                selected: _selectedPacks.contains(packs[index]),
+                onSelectionChanged: () => _toggleSelection(packs[index]),
+                onLongPress: () => _toggleSelection(packs[index]),
+              ),
               itemCount: packs.length,
             ),
     );
+  }
+
+  void _toggleSelection(StickerPack pack) {
+    setState(() {
+      if (_selectedPacks.contains(pack)) {
+        _selectedPacks.remove(pack);
+      } else {
+        _selectedPacks.add(pack);
+      }
+    });
+  }
+
+  Future<void> _sendSelectedToWhatsapp() async {
+    final selected = _selectedPacks.toList();
+    for (final pack in selected) {
+      if (!mounted) return;
+      await sendToWhatsappWithErrorHandling(pack, context);
+    }
+  }
+
+  Future<void> _exportSelected() async {
+    final selected = _selectedPacks.toList();
+    for (final pack in selected) {
+      await exportPack(pack);
+    }
+  }
+
+  Future<void> _deleteSelected() async {
+    final selected = _selectedPacks.toList();
+    final answer = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("Delete ${selected.length} packs?"),
+        content: Text("This cannot be undone."),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(AppLocalizations.of(context)!.cancel)),
+          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: Text(AppLocalizations.of(context)!.delete)),
+        ],
+      ),
+    );
+    if (answer != true) return;
+    for (final pack in selected) {
+      packs.remove(pack);
+      try {
+        await Directory("$packsDir/${pack.id}").delete(recursive: true);
+      } on FileSystemException catch (_) {}
+    }
+    _selectedPacks.clear();
+    savePacks(packs);
+    setState(() {});
   }
 }
