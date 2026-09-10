@@ -21,11 +21,13 @@ import sys
 from pathlib import Path
 
 # --- DependencyVersionChecker.kt thresholds -----------------------------------
-ERROR_GRADLE = (8, 14, 0)
+# Updated for Flutter 3.47+ / 3.50+ where Gradle 9.1.0 and AGP 9.0.1 are the
+# minimums to silence the \"will soon be dropped\" warnings.
+ERROR_GRADLE = (9, 1, 0)
 WARN_GRADLE = (9, 1, 0)
-ERROR_AGP = (8, 11, 1)
+ERROR_AGP = (9, 0, 1)
 WARN_AGP = (9, 0, 1)
-ERROR_KGP = (2, 2, 20)
+ERROR_KGP = (2, 3, 20)
 WARN_KGP = (2, 3, 20)
 
 # --- gradle_utils.dart regexes (Python re has no \k, so quotes are spelled out) -
