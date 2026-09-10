@@ -1,17 +1,23 @@
 @echo off
 REM builds and renames all apks and the appbudle
+REM Set GOOGLE_FONTS_API_KEY before running to enable Google Fonts search
+REM in the built app (get a key at
+REM https://developers.google.com/fonts/docs/developer_api).
+
+set "FONTS_KEY_ARG="
+if defined GOOGLE_FONTS_API_KEY set "FONTS_KEY_ARG=--dart-define=GOOGLE_FONTS_API_KEY=%GOOGLE_FONTS_API_KEY%"
 
 echo Cleaning...
 call flutter clean
 
 echo Building split per abi...
-call flutter build apk --split-per-abi
+call flutter build apk --split-per-abi %FONTS_KEY_ARG%
 
 echo Building combined apk...
-call flutter build apk
+call flutter build apk %FONTS_KEY_ARG%
 
 echo Building bundle...
-call flutter build appbundle
+call flutter build appbundle %FONTS_KEY_ARG%
 
 echo Renaming files...
 for /F "tokens=* USEBACKQ" %%F in (`git rev-parse HEAD`) do (set sha=%%F)
