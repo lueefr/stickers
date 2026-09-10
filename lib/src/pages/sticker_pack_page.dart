@@ -379,12 +379,11 @@ class StickerPackPageState extends State<StickerPackPage> {
 
   Future<void> _pickGif(int index) async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final file = await FilePicker.pickFile(
         type: FileType.custom,
         allowedExtensions: ["gif"],
-        allowMultiple: false,
       );
-      if (result == null || result.files.single.path == null) return;
+      if (file == null || file.path == null) return;
       if (!mounted) return;
       showDialog(
         context: context,
@@ -406,7 +405,7 @@ class StickerPackPageState extends State<StickerPackPage> {
       for (var attempt = 0; attempt < 3; attempt++) {
         final output = "$mediaCacheDir/gif_${DateTime.now().millisecondsSinceEpoch}_$attempt.webp";
         await service.convert(
-          inputFile: result.files.single.path!,
+          inputFile: file.path!,
           outputFile: output,
           quality: quality,
           fps: fps,

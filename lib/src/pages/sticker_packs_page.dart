@@ -106,12 +106,11 @@ class StickerPacksPageState extends State<StickerPacksPage> {
           FloatingActionButton(
             tooltip: AppLocalizations.of(context)!.import,
             onPressed: () async {
-              FilePickerResult? result = await FilePicker.platform.pickFiles(
+              final files = await FilePicker.pickFiles(
                   type: FileType.any,
-                  allowMultiple: true,
                   dialogTitle: AppLocalizations.of(context)!.selectPack);
-              if (result == null) return;
-              for (final f in result.files) {
+              if (files.isEmpty) return;
+              for (final f in files) {
                 try {
                   if (f.path == null) throw const FormatException('File unavailable');
                   await importPack(File(f.path!));
