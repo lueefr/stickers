@@ -58,6 +58,31 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
   }
 
   double? _aspectRatio;
+  bool _isStretching = false;
+
+  Future<void> _stretchToSquare() async {
+    if (_isStretching) return;
+    setState(() => _isStretching = true);
+    try {
+      final state = widget.editorKey.currentState!;
+      final stretched = await stretchStickerToSquare(
+          state.rawImageData, _editorController.rotateDegrees);
+      final output = await saveTemp(stretched);
+      if (!context.mounted) return;
+      Navigator.of(context).pushNamed(
+        "/edit",
+        arguments: EditArguments(
+          pack: widget.pack,
+          index: widget.index,
+          mediaPath: output.path,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isStretching = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -271,45 +296,57 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
                   children: [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                      child: FilledButton(
-                        onPressed: () async {
-                          final state = widget.editorKey.currentState!;
-                          if (state.getCropRect()!.height < .5 || state.getCropRect()!.width < .5) {
-                            showDialog(
-                                context: context,
-                                builder: (ctx) => AlertDialog(
-                                      title: Text(AppLocalizations.of(context)!.cropTooSmall),
-                                      content:
-                                          Text(AppLocalizations.of(context)!.cropTooSmallDetails),
-                                      actions: [
-                                        TextButton(
-                                            onPressed: () => Navigator.of(context).pop(),
-                                            child: Text("Okay 💗")),
-                                        FilledButton(
-                                            onPressed: () => Navigator.of(context).pop(),
-                                            child: Text("Yay 💗")),
-                                      ],
-                                    ));
-                            return;
-                          }
-                          final cropped = await cropSticker(
-                              state.getCropRect()!,
-                              state.rawImageData,
-                              widget.pack,
-                              widget.index,
-                              _editorController.rotateDegrees);
-                          final output = await saveTemp(cropped);
-                          if (!context.mounted) return;
-                          Navigator.of(context).pushNamed(
-                            "/edit",
-                            arguments: EditArguments(
-                              pack: widget.pack,
-                              index: widget.index,
-                              mediaPath: output.path,
-                            ),
-                          );
-                        },
-                        child: Text(AppLocalizations.of(context)!.done),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: _isStretching ? null : _stretchToSquare,
+                            icon: const Icon(Icons.aspect_ratio),
+                            label: Text(
+                                AppLocalizations.of(context)!.stretchToSquare),
+                          ),
+                          const SizedBox(height: 8),
+                          FilledButton(
+                            onPressed: () async {
+                              final state = widget.editorKey.currentState!;
+                              if (state.getCropRect()!.height < .5 || state.getCropRect()!.width < .5) {
+                                showDialog(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                          title: Text(AppLocalizations.of(context)!.cropTooSmall),
+                                          content:
+                                              Text(AppLocalizations.of(context)!.cropTooSmallDetails),
+                                          actions: [
+                                            TextButton(
+                                                onPressed: () => Navigator.of(context).pop(),
+                                                child: Text("Okay 💗")),
+                                            FilledButton(
+                                                onPressed: () => Navigator.of(context).pop(),
+                                                child: Text("Yay 💗")),
+                                          ],
+                                        ));
+                                return;
+                              }
+                              final cropped = await cropSticker(
+                                  state.getCropRect()!,
+                                  state.rawImageData,
+                                  widget.pack,
+                                  widget.index,
+                                  _editorController.rotateDegrees);
+                              final output = await saveTemp(cropped);
+                              if (!context.mounted) return;
+                              Navigator.of(context).pushNamed(
+                                "/edit",
+                                arguments: EditArguments(
+                                  pack: widget.pack,
+                                  index: widget.index,
+                                  mediaPath: output.path,
+                                ),
+                              );
+                            },
+                            child: Text(AppLocalizations.of(context)!.done),
+                          ),
+                        ],
                       ),
                     ),
                   ],
