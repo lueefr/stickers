@@ -9,21 +9,28 @@ flutter build apk --release
 
 ### Android toolchain
 
-The Flutter Gradle plugin refuses to build below hard minimums — the current
-stable SDK (3.47.2) requires Gradle 8.14, AGP 8.11.1 and Kotlin 2.2.20 — so the
-Android side is pinned to:
+The Flutter Gradle plugin refuses to build below hard minimums — as of Flutter
+3.50 the floors are Gradle 9.1.0, AGP 9.0.1 and Kotlin 2.3.20 — so the Android
+side is pinned to:
 
 | Where | What | Version |
 | --- | --- | --- |
-| `android/gradle/wrapper/gradle-wrapper.properties` | Gradle | 8.14.4 |
-| `android/settings.gradle` | Android Gradle Plugin | 8.13.2 |
+| `android/gradle/wrapper/gradle-wrapper.properties` | Gradle | 9.1.0 |
+| `android/settings.gradle` | Android Gradle Plugin | 9.0.1 |
 | `android/settings.gradle` | Kotlin Gradle plugin | 2.4.0 |
 
-Those three are the combination Flutter's own tooling accepts *and* that the
-Kotlin Gradle plugin 2.4.0 fully supports (Gradle 7.6.3–9.5.0, AGP 8.5.2–9.1.0),
-so no AGP 9 / `android.newDsl` migration is needed. Newer Gradle/AGP/Kotlin are
-only *suggested* by `flutter analyze --suggestions` — those hints are warnings
-and do not fail the build.
+Gradle 9.1.0 is the minimum AGP 9.0.1 supports and Kotlin 2.4.0 fully supports
+Gradle 7.6.3–9.5.0 and AGP 8.5.2–9.1.0. AGP 9 requires the compatibility flags
+in `android/gradle.properties`:
+
+```properties
+android.newDsl=false
+android.builtInKotlin=false
+```
+
+Those flags keep the legacy `kotlin-android` plugin working until all
+transitive plugins migrate to built-in Kotlin. With them, the build has zero
+warnings about Gradle/AGP/Kotlin versions, Java 8 obsolescence, or SDK XML v4.
 
 `python3 tool/check_android_versions.py` re-checks the three files against the
 thresholds the Flutter tool enforces (plus the signing-config guard below).

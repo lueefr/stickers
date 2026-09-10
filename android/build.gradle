@@ -6,11 +6,43 @@ allprojects {
 }
 
 rootProject.buildDir = '../build'
+
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
-}
-subprojects {
     project.evaluationDependsOn(':app')
+}
+
+subprojects {
+    // Force Java 17 for all Android subprojects to eliminate
+    // \"source value 8 is obsolete\" warnings from older plugins.
+    afterEvaluate {
+        if (project.hasProperty('android')) {
+            project.android {
+                compileOptions {
+                    sourceCompatibility JavaVersion.VERSION_17
+                    targetCompatibility JavaVersion.VERSION_17
+                }
+            }
+        }
+        // If the subproject uses Kotlin, bump its jvmTarget to 17 as well.
+        if (project.hasProperty('kotlinOptions')) {
+            project.kotlinOptions {
+                jvmTarget = '17'
+            }
+        }
+        // For projects using the newer kotlin DSL (Kotlin 2.x), try to set
+        // the compilerOptions jvmTarget if the extension exists.
+        try {
+            if (project.extensions.findByName('kotlin') != null) {
+                project.kotlin {
+                    jvmToolchain(17)
+                }
+            }
+        } catch (Exception ignored) {
+            // Some subprojects don't have the kotlin extension or use older
+            // Kotlin versions where jvmToolchain isn't available – ignore.
+        }
+    }
 }
 
 tasks.register("clean", Delete) {
