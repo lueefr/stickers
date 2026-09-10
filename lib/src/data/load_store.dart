@@ -7,134 +7,131 @@ import 'package:flutter_archive/flutter_archive.dart';
 import 'package:image_editor/image_editor.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:stickers/src/constants.dart';
+import 'package:stickers/src/data/pack_backup.dart';
 import 'package:stickers/src/data/sticker.dart';
 import 'package:stickers/src/data/sticker_pack.dart';
 import 'package:stickers/src/globals.dart';
 
-void savePacks(List<StickerPack> packs) async {
+Future<void> savePacks(List<StickerPack> packs) async {
   File output = File("$packsDir/packs.json");
-  output.writeAsString(jsonEncode(packs.map((pack) => pack.toJson()).toList()));
+  await output.writeAsString(jsonEncode(packs.map((pack) => pack.toJson()).toList()));
 }
 
-Future<void> exportPack(StickerPack pack) async {
-  Stopwatch sw = Stopwatch()..start();
-  Directory exportDir = Directory(exportCacheDir);
-  Directory packDir = Directory("${exportDir.path}/pack_${DateTime.timestamp().millisecondsSinceEpoch}/");
-  await packDir.create(recursive: true);
-  File jsonFile = File("${packDir.path}/pack.json");
-  Map<String, dynamic> exportData = pack.toJson();
-  //TODO Don't hardcode extensions
-  for (var i = 0; i < pack.stickers.length; i++) {
-    await File(pack.stickers[i].source).copy("${packDir.path}$i.webp");
-    exportData["stickers"][i]["source"] = "$i.webp";
-  }
-  if (pack.trayIcon != null) {
-    await File(pack.trayIcon!).copy("${packDir.path}tray.png");
-    exportData["trayIcon"] = "tray.png";
-  }
-  debugPrint("Copy t=${sw.elapsedMilliseconds}ms");
-  await jsonFile.writeAsString(jsonEncode(exportData));
-  debugPrint("Json written  t=${sw.elapsedMilliseconds}ms");
+Future<void> exportPack(StickerPack pack) => exportPacks([pack]);
 
-  File zipFile = File("${exportDir.path}/${pack.title.replaceAll(RegExp("[^ \\-_!&a-zA-Z0-9]"), "_")}.zip");
-  await ZipFile.createFromDirectory(sourceDir: packDir, zipFile: zipFile);
-
-  debugPrint("Exported to: ${zipFile.path} t=${sw.elapsedMilliseconds}ms");
-  SharePlus.instance.share(ShareParams(files: [XFile(zipFile.path)]));
+/// Shares one archive, regardless of how many packs were selected.
+Future<void> exportPacks(List<StickerPack> selected) async {
+  if (selected.isEmpty) return;
+  final cache = await Directory(exportCacheDir).create(recursive: true);
+  final work = await cache.createTemp('backup_');
+  final contents = await Directory('${work.path}/contents').create();
+  try {
+    await writePackBackup(selected, contents);
+    final zip = File('${work.path}/sticker_pack.zip');
+    await ZipFile.createFromDirectory(sourceDir: contents, zipFile: zip);
+    await SharePlus.instance.share(ShareParams(files: [XFile(zip.path)]));
+  } finally {
+    await contents.delete(recursive: true);
+    // Keep the shared ZIP in the export cache: the receiving app may read it later.
+  }
 }
 
 Future<void> importPack(File f) async {
   //TODO show progress
   Stopwatch sw = Stopwatch()..start();
   Directory importDir = Directory(mediaCacheDir);
-  Directory unzipDir = Directory("${importDir.path}pack_${DateTime.timestamp().millisecondsSinceEpoch}/");
-  await unzipDir.create(recursive: true);
-  await ZipFile.extractToDirectory(zipFile: f, destinationDir: unzipDir);
-  debugPrint("Unzip t=${sw.elapsedMilliseconds}ms");
+  await importDir.create(recursive: true);
+  final unzipDir = await importDir.createTemp("pack_");
+  final createdDirs = <Directory>[];
+  try {
+    await ZipFile.extractToDirectory(zipFile: f, destinationDir: unzipDir);
+    debugPrint("Unzip t=${sw.elapsedMilliseconds}ms");
 
-  List<StickerPack> packsToAdd = [];
+    List<StickerPack> packsToAdd = [];
 
-  switch (f.path.split(".").last.toLowerCase()) {
-    case "wastickers":
-      final dirContents = unzipDir.listSync();
-      final pack = StickerPack(
-          (await File("${unzipDir.path}title.txt").readAsString()).replaceAll("\n", ""),
-          (await File("${unzipDir.path}author.txt").readAsString()).replaceAll("\n", ""),
-          "pack_${DateTime.timestamp().millisecondsSinceEpoch}",
-          dirContents
-              .map((entry) => entry.path)
-              .where((path) => path.toLowerCase().endsWith(".webp"))
-              .map((path) => Sticker(path, ["❤"]))
-              .toList(),
-          "1000",
-          false, // It's not possible to directly export animated packs from that app.
-          trayIcon: dirContents.where((entry) => entry.path.toLowerCase().endsWith(".png")).firstOrNull?.path);
-      packsToAdd.add(pack);
-      break;
-    case "stickify":
-      final dirs = unzipDir.listSync().whereType<Directory>();
-      for (final dir in dirs) {
-        final json = jsonDecode(File("${dir.path}/contents.json").readAsStringSync());
-        for (final packJson in json["sticker_packs"]) {
-          final pack = StickerPack(
-            packJson["name"],
-            packJson["publisher"],
-            packJson["identifier"],
-            (packJson["stickers"] as List)
-                .map((sticker) => Sticker(
-                      "${dir.path}/${sticker["image_file"]}",
-                      (sticker["emojis"] as List).isEmpty ? ["❤"] : sticker["emojis"],
-                    ))
+    switch (f.path.split(".").last.toLowerCase()) {
+      case "wastickers":
+        final dirContents = unzipDir.listSync();
+        final pack = StickerPack(
+            (await File("${unzipDir.path}/title.txt").readAsString()).replaceAll("\n", ""),
+            (await File("${unzipDir.path}/author.txt").readAsString()).replaceAll("\n", ""),
+            "pack_${DateTime.timestamp().millisecondsSinceEpoch}",
+            dirContents
+                .map((entry) => entry.path)
+                .where((path) => path.toLowerCase().endsWith(".webp"))
+                .map((path) => Sticker(path, ["❤"]))
                 .toList(),
-            packJson["image_data_version"],
-            packJson["animated_sticker_pack"],
-            publisherWebsite: packJson["publisher_website"],
-            licenseAgreementWebsite: packJson["license_agreement_website"],
-            privacyPolicyWebsite: packJson["privacy_policy_website"],
-          );
-          packsToAdd.add(pack);
+            "1000",
+            false, // It's not possible to directly export animated packs from that app.
+            trayIcon: dirContents.where((entry) => entry.path.toLowerCase().endsWith(".png")).firstOrNull?.path);
+        packsToAdd.add(pack);
+        break;
+      case "stickify":
+        final dirs = unzipDir.listSync().whereType<Directory>();
+        for (final dir in dirs) {
+          final json = jsonDecode(File("${dir.path}/contents.json").readAsStringSync());
+          for (final packJson in json["sticker_packs"]) {
+            final pack = StickerPack(
+              packJson["name"],
+              packJson["publisher"],
+              packJson["identifier"],
+              (packJson["stickers"] as List)
+                  .map((sticker) => Sticker(
+                        "${dir.path}/${sticker["image_file"]}",
+                        (sticker["emojis"] as List).isEmpty ? ["❤"] : sticker["emojis"],
+                      ))
+                  .toList(),
+              packJson["image_data_version"],
+              packJson["animated_sticker_pack"],
+              publisherWebsite: packJson["publisher_website"],
+              licenseAgreementWebsite: packJson["license_agreement_website"],
+              privacyPolicyWebsite: packJson["privacy_policy_website"],
+            );
+            packsToAdd.add(pack);
+          }
         }
+        break;
+      default:
+        packsToAdd.addAll(await readPackBackup(unzipDir));
+    }
+    debugPrint("Parse t=${sw.elapsedMilliseconds}ms");
+
+    // Validate every referenced file before changing the user's library.
+    for (final pack in packsToAdd) {
+      for (final source in [
+        ...pack.stickers.map((sticker) => sticker.source),
+        if (pack.trayIcon != null) pack.trayIcon!,
+      ]) {
+        await validateBackupFile(unzipDir, source);
       }
-      break;
-    default:
-      //TODO support stickify's backup file format
-      File jsonFile = File("${unzipDir.path}pack.json");
-      final pack = StickerPack.fromJson(jsonDecode(await jsonFile.readAsString()));
-      for (var sticker in pack.stickers) {
-        sticker.source = unzipDir.path + sticker.source;
+    }
+    await Directory(packsDir).create(recursive: true);
+    for (final pack in packsToAdd) {
+      // Never use an untrusted archive identifier as a destination path.
+      final destination = await Directory(packsDir).createTemp('imported_');
+      createdDirs.add(destination);
+      pack.id = destination.uri.pathSegments.where((s) => s.isNotEmpty).last;
+      for (var i = 0; i < pack.stickers.length; i++) {
+        final file = await File(pack.stickers[i].source)
+            .copy('${destination.path}/imported_$i.webp');
+        pack.stickers[i].source = file.path;
       }
       if (pack.trayIcon != null) {
-        pack.trayIcon = unzipDir.path + pack.trayIcon!;
+        pack.trayIcon = (await File(pack.trayIcon!)
+            .copy('${destination.path}/imported_tray.webp')).path;
       }
-      packsToAdd.add(pack);
+    }
+    await savePacks([...packs, ...packsToAdd]);
+    packs.addAll(packsToAdd);
+  } catch (_) {
+    for (final directory in createdDirs) {
+      await directory.delete(recursive: true);
+    }
+    rethrow;
+  } finally {
+    await unzipDir.delete(recursive: true);
+    // The selected file (and its parent) belongs to the user, not to us.
   }
-  debugPrint("Parse t=${sw.elapsedMilliseconds}ms");
-
-  for (final pack in packsToAdd) {
-    while (packs.where((p) => p.id == pack.id).isNotEmpty) {
-      pack.id = "${pack.id}_";
-    }
-    await Directory("$packsDir/${pack.id}").create(recursive: true);
-
-    for (var i = 0; i < pack.stickers.length; i++) {
-      await File(pack.stickers[i].source).copy("$packsDir/${pack.id}/imported_$i.webp");
-      pack.stickers[i].source = File("$packsDir/${pack.id}/imported_$i.webp").path;
-    }
-    if (pack.trayIcon != null) {
-      await File("${pack.trayIcon}").copy("$packsDir/${pack.id}/imported_tray.webp");
-      pack.trayIcon = File("$packsDir/${pack.id}/imported_tray.webp").path;
-    }
-    debugPrint("[${pack.id}] Copy t=${sw.elapsedMilliseconds}ms");
-    packs.add(pack);
-  }
-
-  // Clean up - even if the same files are imported again, they are copied again so there's no point in caching them
-  // There is no await here since we don't need to wait
-  // until the deletion of the temporary folder is complete to move on
-  unzipDir.delete(recursive: true);
-  f.parent.delete(recursive: true);
-
-  savePacks(packs);
 }
 
 Future<List<StickerPack>> getPacks() async {
