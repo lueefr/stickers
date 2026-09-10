@@ -5,6 +5,16 @@ allprojects {
     }
 }
 
+// Flutter looks for Android outputs in the repository-level build directory.
+// Keep Gradle's modern DirectoryProperty API while matching that convention.
+def newBuildDir = rootProject.layout.buildDirectory.dir("../../build").get()
+rootProject.layout.buildDirectory.value(newBuildDir)
+
+subprojects {
+    def newSubprojectBuildDir = newBuildDir.dir(project.name)
+    project.layout.buildDirectory.value(newSubprojectBuildDir)
+}
+
 subprojects {
     project.evaluationDependsOn(':app')
 }
@@ -63,5 +73,5 @@ subprojects {
 }
 
 tasks.register("clean", Delete) {
-    delete fileTree(dir: rootDir, include: '**/build')
+    delete rootProject.layout.buildDirectory
 }
