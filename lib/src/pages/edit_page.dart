@@ -5,7 +5,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:image_editor/image_editor.dart';
+import 'package:image_editor/image_editor.dart' hide ImageSource;
 import 'package:image_picker/image_picker.dart';
 import 'package:matrix_gesture_detector/matrix_gesture_detector.dart';
 import 'package:stickers/generated/intl/app_localizations.dart';

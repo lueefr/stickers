@@ -5,12 +5,18 @@ import 'package:extended_image/extended_image.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:stickers/src/api_keys.dart';
 import 'package:stickers/src/constants.dart';
 import 'package:stickers/src/fonts_api/fonts_models.dart';
 import 'package:stickers/src/fonts_api/fonts_registry.dart';
 
 String apiURL = "https://www.googleapis.com/webfonts/v1/webfonts";
+
+/// Google Fonts Developer API key, supplied at build time, e.g.:
+/// `flutter build apk --dart-define=GOOGLE_FONTS_API_KEY=<key>`
+/// Get a key at https://developers.google.com/fonts/docs/developer_api
+/// An empty key only disables downloading the font list (a previously cached
+/// list keeps working); everything else in the app is unaffected.
+const String fontsKey = String.fromEnvironment('GOOGLE_FONTS_API_KEY');
 /*
  * https://developers.google.com/fonts/docs/developer_api/?apix=true
  * webfonts?key=<your_key>[&family=<family>][&subset=<subset>][&capability=<capability>...][&sort=<sort>]
@@ -31,6 +37,13 @@ Future<GoogleFontsReply> getFonts({String? family, String? category}) async {
       debugPrint(e.toString());
       debugPrintStack(stackTrace: st);
     }
+  }
+  if (fontsKey.isEmpty) {
+    throw StateError(
+      'Missing Google Fonts API key. Rebuild with '
+      '--dart-define=GOOGLE_FONTS_API_KEY=<your-key> '
+      '(see https://developers.google.com/fonts/docs/developer_api).',
+    );
   }
   Uri uri = Uri.parse(apiURL).replace(queryParameters: {
     "key": fontsKey,
