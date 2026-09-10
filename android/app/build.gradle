@@ -59,16 +59,30 @@ android {
     }
 
     signingConfigs {
-        create("release") {
-            keyAlias = keystoreProperties["keyAlias"]
-            keyPassword = keystoreProperties["keyPassword"]
-            storeFile = new File(keystoreProperties["storeFile"])
-            storePassword = keystoreProperties["storePassword"]
+        // Only set up release signing when android/key.properties exists — it is
+        // gitignored, so a fresh clone has none and `flutter build apk --release`
+        // would otherwise fail while configuring the project.
+        if (keystorePropertiesFile.exists()) {
+            create("release") {
+                keyAlias = keystoreProperties["keyAlias"]
+                keyPassword = keystoreProperties["keyPassword"]
+                def storeFilePath = keystoreProperties["storeFile"]
+                def store = new File(storeFilePath)
+                // Relative storeFile paths are resolved against the project root,
+                // not the daemon's working directory.
+                storeFile = store.isAbsolute() ? store : rootProject.file(storeFilePath)
+                storePassword = keystoreProperties["storePassword"]
+            }
         }
     }
     buildTypes {
         release {
-            signingConfig signingConfigs.release
+            if (keystorePropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            } else {
+                logger.warn("android/key.properties not found: building an unsigned release APK. " +
+                    "Add a keystore to sign release builds for publishing.")
+            }
         }
     }
     externalNativeBuild {
