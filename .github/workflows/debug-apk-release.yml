@@ -188,7 +188,11 @@ jobs:
           git commit -m "chore: bump version to $FULL_VERSION [skip ci]"
           branch="${GITHUB_REF_NAME:?}"
           git fetch origin "$branch"
-          if ! git rebase "origin/$branch"; then
+          # Flutter tooling can leave tracked generated files modified after
+          # the version commit. Autostash those changes so a concurrent push
+          # can still be rebased without failing with "cannot rebase: You
+          # have unstaged changes".
+          if ! git rebase --autostash "origin/$branch"; then
             git rebase --abort
             echo "::warning::could not rebase the version bump onto the latest $branch; the release below still goes ahead and the next run self-heals from it"
             echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
