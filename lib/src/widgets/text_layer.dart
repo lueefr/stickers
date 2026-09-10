@@ -129,18 +129,22 @@ class TextLayerState extends State<TextLayer> with TickerProviderStateMixin {
             child: textStack,
           );
 
-    return Transform(
-      origin: const Offset(0, 0),
-      transform: widget.text.transform,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          GestureDetector(
-            onTap: enableEditing,
-            child: textWidget,
-          ),
-        ],
+    // Sticker text must render identically regardless of the system font
+    // scaling, otherwise the design changes per device accessibility setting.
+    return MediaQuery.withNoTextScaling(
+      child: Transform(
+        origin: const Offset(0, 0),
+        transform: widget.text.transform,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            GestureDetector(
+              onTap: enableEditing,
+              child: textWidget,
+            ),
+          ],
+        ),
       ),
     );
   }

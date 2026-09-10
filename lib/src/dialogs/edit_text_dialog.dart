@@ -60,11 +60,13 @@ class _TextEditingDialogState extends State<TextEditingDialog> {
       filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
       child: LayoutBuilder(builder: (context, constraints) {
         final isHorizontal = constraints.maxWidth > constraints.maxHeight;
-        final editableTextStack = Stack(
+        // The sticker text must not be distorted by the system font scaling,
+        // otherwise the same sticker would look different on devices with
+        // different accessibility settings.
+        final editableTextStack = MediaQuery.withNoTextScaling(
+          child: Stack(
           children: [
-            Padding(
-              padding: const EdgeInsets.only(right: 3.0),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 Text(
                   widget.controller.text,
                   textAlign: TextAlign.center,
@@ -81,8 +83,7 @@ class _TextEditingDialogState extends State<TextEditingDialog> {
                     fontFamily: widget.parent.text.fontName,
                   ),
                 ),
-              ]),
-            ),
+            ]),
             EditableText(
               autofocus: true,
               onChanged: (_) {
@@ -109,6 +110,7 @@ class _TextEditingDialogState extends State<TextEditingDialog> {
               backgroundCursorColor: widget.parent.text.textColor,
             ),
           ],
+          ),
         );
         final decoratedTextField = widget.parent.data.backgroundColor == Colors.transparent
             ? editableTextStack
@@ -407,7 +409,7 @@ class _TextEditingDialogState extends State<TextEditingDialog> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: colors
-                      .getRange((colors.length / 2).floor() + 1, colors.length)
+                      .getRange((colors.length / 2).floor(), colors.length)
                       .map((c) => ColorButton(
                             size: constraints.maxWidth / 10 - 4,
                             c,
@@ -441,7 +443,7 @@ class _TextEditingDialogState extends State<TextEditingDialog> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: colors
-                      .getRange((colors.length / 2).floor() + 1, colors.length)
+                      .getRange((colors.length / 2).floor(), colors.length)
                       .map((c) => ColorButton(
                             size: constraints.maxWidth / 10 - 4,
                             c,
@@ -494,7 +496,7 @@ class _TextEditingDialogState extends State<TextEditingDialog> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: colors
-                      .getRange((colors.length / 2).floor() + 1, colors.length)
+                      .getRange((colors.length / 2).floor(), colors.length)
                       .map((c) => ColorButton(
                             size: constraints.maxWidth / 10 - 4,
                             c,
@@ -563,7 +565,11 @@ class _TextEditingDialogState extends State<TextEditingDialog> {
                 child: Column(
                   children: [
                     AnimatedSwitcher(
-                        duration: Duration(milliseconds: 150), child: _tools[_currentTool]),
+                        duration: Duration(milliseconds: 150),
+                        child: KeyedSubtree(
+                          key: ValueKey<int>(_currentTool),
+                          child: _tools[_currentTool],
+                        )),
                     actions,
                   ],
                 ),
@@ -674,7 +680,9 @@ class LabeledIconButton extends StatelessWidget {
           padding: const EdgeInsets.all(4.0).copyWith(bottom: 0, top: 8),
           child: AnimatedContainer(
             duration: Duration(milliseconds: 200),
-            transform: Matrix4.identity() * (active ? 1.1 : 1.0),
+            // Matrix4.identity() * factor would also scale the w component,
+            // which cancels the intended zoom after the perspective divide.
+            transform: Matrix4.diagonal3Values(active ? 1.1 : 1.0, active ? 1.1 : 1.0, 1),
             transformAlignment: Alignment.center,
             curve: Curves.ease,
             child: Column(
@@ -682,7 +690,7 @@ class LabeledIconButton extends StatelessWidget {
               children: [
                 AnimatedContainer(
                     duration: Duration(milliseconds: 200),
-                    transform: Matrix4.identity() * (active ? 1.2 : 1.0),
+                    transform: Matrix4.diagonal3Values(active ? 1.2 : 1.0, active ? 1.2 : 1.0, 1),
                     transformAlignment: Alignment.center,
                     curve: Curves.ease,
                     padding: EdgeInsets.all(4),

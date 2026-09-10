@@ -72,7 +72,17 @@ class _EyedropperDialogState extends State<EyedropperDialog> {
                         decoration: BoxDecoration(), // For the clip to work
                         child: GestureDetector(
                           onPanUpdate: (details) {
-                            _samplePosition += details.delta;
+                            final double ratio = MediaQuery.of(context).devicePixelRatio;
+                            // Keep the crosshair inside the image so the
+                            // sampled color always matches what is shown.
+                            _samplePosition = Offset(
+                              (_samplePosition.dx + details.delta.dx)
+                                  .clamp(0.0, (img.width / ratio - 1).clamp(0.0, double.infinity))
+                                  .toDouble(),
+                              (_samplePosition.dy + details.delta.dy)
+                                  .clamp(0.0, (img.height / ratio - 1).clamp(0.0, double.infinity))
+                                  .toDouble(),
+                            );
                             _sampleColor(img);
                             setState(() {});
                           },
@@ -236,6 +246,11 @@ class _HSLPickerState extends State<HSLPicker> {
   void initState() {
     super.initState();
     _updateFromWidgetColor();
+    // The fragment programs compile asynchronously; repaint once they are
+    // ready, otherwise the tracks stay unshaded until the next interaction.
+    GradientSliderTrackShape.prime().then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   void _updateFromWidgetColor() {
@@ -258,7 +273,8 @@ class _HSLPickerState extends State<HSLPicker> {
       children: [
         SliderTheme(
           data:
-              SliderTheme.of(context).copyWith(trackShape: GradientSliderTrackShape(null, _s, _l)),
+              SliderTheme.of(context).copyWith(trackShape:
+                  GradientSliderTrackShape(null, _s, _l, MediaQuery.of(context).devicePixelRatio)),
           child: Slider(
               thumbColor: _color.toColor(),
               min: 0,
@@ -271,7 +287,8 @@ class _HSLPickerState extends State<HSLPicker> {
         ),
         SliderTheme(
           data:
-              SliderTheme.of(context).copyWith(trackShape: GradientSliderTrackShape(_h, null, _l)),
+              SliderTheme.of(context).copyWith(trackShape:
+                  GradientSliderTrackShape(_h, null, _l, MediaQuery.of(context).devicePixelRatio)),
           child: Slider(
               thumbColor: _color.toColor(),
               min: 0,
@@ -284,7 +301,8 @@ class _HSLPickerState extends State<HSLPicker> {
         ),
         SliderTheme(
           data:
-              SliderTheme.of(context).copyWith(trackShape: GradientSliderTrackShape(_h, _s, null)),
+              SliderTheme.of(context).copyWith(trackShape:
+                  GradientSliderTrackShape(_h, _s, null, MediaQuery.of(context).devicePixelRatio)),
           child: Slider(
               thumbColor: _color.toColor(),
               min: 0,
@@ -308,13 +326,19 @@ class GradientSliderTrackShape extends SliderTrackShape with BaseSliderTrackShap
   double? h;
   double? s;
   double? l;
+
+  /// FlutterFragCoord() reports fragment positions in physical pixels, while
+  /// layout happens in logical pixels, so the shader uniforms must be scaled.
+  final double devicePixelRatio;
   final Paint _paint = Paint();
 
-  GradientSliderTrackShape(this.h, this.s, this.l) {
-    loadShaders();
+  GradientSliderTrackShape(this.h, this.s, this.l, [this.devicePixelRatio = 1.0]) {
+    prime();
   }
 
-  void loadShaders() async {
+  /// Loads (and caches) the fragment programs. Await this and rebuild once to
+  /// make the first painted frame already show the gradients.
+  static Future<void> prime() async {
     _hueGradientProgram ??= await FragmentProgram.fromAsset('assets/shaders/hue_gradient.frag');
     _saturationGradientProgram ??=
         await FragmentProgram.fromAsset('assets/shaders/saturation_gradient.frag');
@@ -347,10 +371,11 @@ class GradientSliderTrackShape extends SliderTrackShape with BaseSliderTrackShap
 
     if (program != null) {
       final shader = program.fragmentShader();
-      shader.setFloat(0, barRect.width);
-      shader.setFloat(1, barRect.height);
-      shader.setFloat(2, barRect.left);
-      shader.setFloat(3, barRect.top);
+      final double ratio = devicePixelRatio;
+      shader.setFloat(0, barRect.width * ratio);
+      shader.setFloat(1, barRect.height * ratio);
+      shader.setFloat(2, barRect.left * ratio);
+      shader.setFloat(3, barRect.top * ratio);
 
       try {
         if (h == null) {
@@ -368,6 +393,11 @@ class GradientSliderTrackShape extends SliderTrackShape with BaseSliderTrackShap
       }
 
       _paint.shader = shader;
+    } else {
+      // The fragment programs compile asynchronously; paint a neutral track
+      // instead of leaving a black bar until they are ready.
+      _paint.shader = null;
+      _paint.color = const Color(0x40FFFFFF);
     }
     context.canvas.drawRRect(RRect.fromRectAndRadius(barRect, Radius.circular(10)), _paint);
   }

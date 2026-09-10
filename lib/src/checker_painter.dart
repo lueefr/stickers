@@ -3,52 +3,57 @@ import 'dart:math';
 import 'package:flutter/material.dart' hide Image;
 
 class CheckerPainter extends CustomPainter {
-  BuildContext context;
   Function(Size)? sizeCallback;
 
-  CheckerPainter(this.context, {this.sizeCallback, this.fg, this.bg});
+  final Color fg;
+  final Color bg;
 
-  final Color? fg;
-  final Color? bg;
+  /// The theme-dependent colors are resolved at construction time (i.e. during
+  /// `build`) so that [shouldRepaint] can compare them instead of repainting
+  /// every frame, while still picking up theme changes on rebuild.
+  CheckerPainter(BuildContext context, {this.sizeCallback, Color? fg, Color? bg})
+      : fg = fg ?? defaultForeground(context),
+        bg = bg ?? defaultBackground(context);
+
+  static Color defaultForeground(BuildContext context) => Theme.of(context).brightness == Brightness.light
+      ? Color.lerp(Theme.of(context).colorScheme.primary, Theme.of(context).colorScheme.surface, .8)!
+      : Color.lerp(Theme.of(context).colorScheme.primary, Theme.of(context).colorScheme.surface, .9)!;
+
+  static Color defaultBackground(BuildContext context) => Theme.of(context).brightness == Brightness.light
+      ? Color.lerp(Theme.of(context).colorScheme.primary, Theme.of(context).colorScheme.surface, .9)!
+      : Color.lerp(Theme.of(context).colorScheme.primary, Theme.of(context).colorScheme.surface, .95)!;
 
   @override
   void paint(Canvas canvas, Size size) {
     if (sizeCallback != null) sizeCallback!(size);
-    checkerPainter(canvas, Rect.fromLTWH(0, 0, size.width, size.height), context, fg, bg);
+    checkerPainter(canvas, Rect.fromLTWH(0, 0, size.width, size.height), null, bg, fg);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    return true;
+  bool shouldRepaint(covariant CheckerPainter oldDelegate) {
+    return oldDelegate.fg != fg || oldDelegate.bg != bg;
   }
 
-  static void checkerPainter(Canvas canvas, Rect rect, BuildContext context, [Color? bg, Color? fg]) {
+  static void checkerPainter(Canvas canvas, Rect rect, BuildContext? context, [Color? bg, Color? fg]) {
     // Paint a checkerboard below the image to indicate transparency
-    fg = fg ?? (Theme.of(context).brightness == Brightness.light
-        ? Color.lerp(Theme.of(context).colorScheme.primary, Theme.of(context).colorScheme.surface, .8)
-        : Color.lerp(Theme.of(context).colorScheme.primary, Theme.of(context).colorScheme.surface, .9));
-    bg = bg ?? (Theme.of(context).brightness == Brightness.light
-            ? Color.lerp(Theme.of(context).colorScheme.primary, Theme.of(context).colorScheme.surface, .9)
-            : Color.lerp(Theme.of(context).colorScheme.primary, Theme.of(context).colorScheme.surface, .95));
+    assert(context != null || (fg != null && bg != null), 'Either colors or a BuildContext must be provided');
+    fg ??= defaultForeground(context!);
+    bg ??= defaultBackground(context!);
 
     double size = 10;
     final checkerPaint = Paint();
     checkerPaint.blendMode = BlendMode.srcOver;
     checkerPaint.style = PaintingStyle.fill;
 
-    // It's ok to null check like this since lerp only returns null only if both arguments are null,
-    // Which isn't the case here
-    checkerPaint.color = bg!;
+    checkerPaint.color = bg;
     canvas.drawRect(rect, checkerPaint);
-    checkerPaint.color = fg!;
+    checkerPaint.color = fg;
     canvas.clipRect(rect);
 
-    // Clamp to screen area for performance reasons.
-    // Not optimal since canvas is still bigger than display area
-    // Not something I can fix here tho
-
-    final maxX = min(MediaQuery.of(context).size.width, rect.right);
-    final maxY = min(MediaQuery.of(context).size.height, rect.bottom);
+    // The canvas is clipped to the widget bounds anyway, so iterating over
+    // the rect is enough and works no matter where the widget is on screen.
+    final maxX = rect.right;
+    final maxY = rect.bottom;
 
     int row = 0;
     for (double y = max(rect.top, 0); y < maxY; y += size) {

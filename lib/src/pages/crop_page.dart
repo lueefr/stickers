@@ -52,9 +52,9 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    super.dispose();
     _maskColorController.removeListener(_animationListener);
     _maskColorController.dispose();
+    super.dispose();
   }
 
   double? _aspectRatio;

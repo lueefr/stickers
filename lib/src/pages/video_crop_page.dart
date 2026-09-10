@@ -91,10 +91,12 @@ class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateM
 
   @override
   void dispose() {
-    super.dispose();
+    // Dispose the controllers before super.dispose() so pending video
+    // callbacks can no longer hit setState() on a disposed State.
     _maskColorController.removeListener(_animationListener);
     _maskColorController.dispose();
     _controller.dispose();
+    super.dispose();
   }
 
   @override
