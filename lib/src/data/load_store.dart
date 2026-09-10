@@ -186,6 +186,29 @@ Future<Uint8List> cropSticker(
   return (await ImageMerger.mergeToMemory(option: option))!;
 }
 
+/// Stretches the image to a 1:1 (square) aspect ratio without cutting anything.
+///
+/// It automatically detects which axis is shorter and stretches it to match the
+/// longer one, so the whole image is kept and the result is a perfect square.
+/// The square is then fitted to the standard 512x512 sticker size.
+Future<Uint8List> stretchStickerToSquare(
+    Uint8List rawImageData, double rotation) async {
+  final option = ImageEditorOption();
+
+  // Apply the same rotation the user performed in the crop screen.
+  final int rot = rotation.truncate();
+  if (rot != 0) {
+    option.addOption(RotateOption(rot));
+  }
+
+  // keepRatio: false stretches the shorter axis to fill the square canvas,
+  // which is exactly "stretch to 1:1" (no cropping). The scale option also
+  // fits the result onto the 512x512 sticker size.
+  option.addOption(ScaleOption(512, 512, keepRatio: false));
+  option.outputFormat = const OutputFormat.webp_lossy(50);
+  return (await ImageEditor.editImage(image: rawImageData, imageEditorOption: option))!;
+}
+
 /// Adds a sticker to a sticker pack
 /// Copies the file to the required place
 ///

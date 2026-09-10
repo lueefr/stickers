@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -37,16 +35,10 @@ class SettingsService {
 
   Future<String> defaultAuthor() async => _prefs.getString("defaultAuthor") ?? "auto-generated";
 
-  Future<String> locale() async => _prefs.getString("locale") ?? _getLocale();
+  /// Returns the language override, or "system" to follow the device language.
+  Future<String> locale() async => _prefs.getString("locale") ?? "system";
 
-  /// Gets the locale from the system settings if unset in config
-  String _getLocale() {
-    if (Platform.localeName.startsWith("de")) return "de";
-    if (Platform.localeName.startsWith("fr")) return "fr";
-    return "en";
-  }
-
-  /// Persists the user's preferred ThemeMode to local or remote storage.
+  /// Persists the user's preferred ThemeMode to local storage.
   Future<void> updateThemeMode(ThemeMode theme) async {
     _prefs.setString("themeMode", theme.name);
   }

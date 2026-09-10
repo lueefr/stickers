@@ -36,16 +36,20 @@ class StickersApp extends StatefulWidget {
 }
 
 class StickersAppState extends State<StickersApp> {
-  late Locale _locale;
+  /// The app language override; `null` means "follow the system language".
+  late Locale? _locale;
 
   @override
   void initState() {
     super.initState();
-    _locale = Locale.fromSubtags(languageCode: widget.settingsController.locale);
+    _locale = parseLocaleSetting(widget.settingsController.locale);
     initPlatformState();
   }
 
-  void setLocale(Locale value) {
+  static Locale? parseLocaleSetting(String? language) =>
+      (language == null || language == "system") ? null : Locale.fromSubtags(languageCode: language);
+
+  void setLocale(Locale? value) {
     setState(() {
       _locale = value;
     });
@@ -88,6 +92,9 @@ class StickersAppState extends State<StickersApp> {
       listenable: widget.settingsController,
       builder: (BuildContext context, Widget? child) {
         return MaterialApp(
+          // The "DEBUG" banner in the top right corner is not helpful here.
+          debugShowCheckedModeBanner: false,
+
           // Providing a restorationScopeId allows the Navigator built by the
           // MaterialApp to restore the navigation stack when a user leaves and
           // returns to the app after it has been killed while running in the
@@ -103,12 +110,9 @@ class StickersAppState extends State<StickersApp> {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          supportedLocales: const [
-            Locale('en', ''), // English, no country code
-            Locale('de', ''),
-            Locale('fr', ''),
-            Locale('ru', ''),
-          ],
+          // Automatically every language that has an ARB file in lib/l10n (see tool/translate.py).
+          // If the device language has no translation, Flutter falls back to English.
+          supportedLocales: AppLocalizations.supportedLocales,
           locale: _locale,
 
           // Use AppLocalizations to configure the correct application title

@@ -8,6 +8,7 @@ import 'package:stickers/src/app.dart';
 import 'package:stickers/src/constants.dart';
 import 'package:stickers/src/dialogs/edit_quickmode_defaults_dialog.dart';
 import 'package:stickers/src/globals.dart';
+import 'package:stickers/src/languages.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'settings_controller.dart';
@@ -112,33 +113,25 @@ class SettingsPage extends StatelessWidget {
                       value: controller.locale,
                       items: [
                         DropdownMenuItem(
-                            value: "en",
+                            value: "system",
                             child: Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 8),
-                              child: Text("English"),
+                              child: Text(AppLocalizations.of(context)!.system),
                             )),
-                        DropdownMenuItem(
-                            value: "fr",
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
-                              child: Text("Français"),
-                            )),
-                        DropdownMenuItem(
-                            value: "de",
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
-                              child: Text("Deutsch"),
-                            )),
-                        DropdownMenuItem(
-                            value: "ru",
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
-                              child: Text("Русский"),
-                            )),
+                        // The language list is derived from the generated ARB files,
+                        // so new translations show up here automatically.
+                        for (final locale in AppLocalizations.supportedLocales)
+                          DropdownMenuItem(
+                              value: locale.languageCode,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                child: Text(languageDisplayName(locale.languageCode)),
+                              )),
                       ],
                       onChanged: (value) {
                         if (value == null) return;
-                        StickersApp.of(context)!.setLocale(Locale.fromSubtags(languageCode: value));
+                        StickersApp.of(context)!
+                            .setLocale(StickersAppState.parseLocaleSetting(value));
                         controller.updateLocale(value);
                       },
                     ),
