@@ -79,7 +79,9 @@ class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateM
 
   void _videoListener() {
     if (_editing) return;
-    setState(() {});
+    // No setState here on purpose: the player fires this listener on every
+    // video frame, so the play button and the progress indicator below listen
+    // to the controller directly and rebuild only themselves.
     if (_controller.value.position > _controller.value.duration * _range.end) {
       _requestSeek(_controller.value.duration * _range.start);
     }
@@ -96,6 +98,7 @@ class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateM
     _maskColorController.removeListener(_animationListener);
     _maskColorController.dispose();
     _controller.dispose();
+    service.dispose();
     super.dispose();
   }
 
@@ -139,32 +142,35 @@ class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateM
                       ),
                     ),
                     Center(
-                      child: _controller.value.isPlaying
-                          ? AnimatedOpacity(
-                              opacity: _btnOpacity,
-                              duration: Duration(milliseconds: 300),
-                              child: IconButton(
-                                onPressed: () {
-                                  _controller.pause();
-                                  setState(() {});
-                                },
-                                icon: Icon(
-                                  Icons.pause,
-                                  color: Colors.white,
-                                  shadows: [Shadow(color: Colors.black, blurRadius: 32)],
-                                ),
-                                iconSize: 100,
-                              ),
-                            )
-                          : IconButton(
+                      child: ValueListenableBuilder<VideoPlayerValue>(
+                        valueListenable: _controller,
+                        builder: (context, value, _) {
+                          if (!value.isPlaying) {
+                            return IconButton(
                               onPressed: _play,
-                              icon: Icon(
+                              icon: const Icon(
                                 Icons.play_arrow,
                                 color: Colors.white,
                                 shadows: [Shadow(color: Colors.black, blurRadius: 32)],
                               ),
                               iconSize: 100,
+                            );
+                          }
+                          return AnimatedOpacity(
+                            opacity: _btnOpacity,
+                            duration: const Duration(milliseconds: 300),
+                            child: IconButton(
+                              onPressed: () => _controller.pause(),
+                              icon: const Icon(
+                                Icons.pause,
+                                color: Colors.white,
+                                shadows: [Shadow(color: Colors.black, blurRadius: 32)],
+                              ),
+                              iconSize: 100,
                             ),
+                          );
+                        },
+                      ),
                     )
                   ],
                 ),
@@ -173,7 +179,7 @@ class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateM
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                SizedBox(
+                const SizedBox(
                   height: 10,
                 ),
                 Padding(
@@ -186,12 +192,12 @@ class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateM
                         onPressed: () => setState(() {
                           _rotationDegrees = (_rotationDegrees - 90) % 360;
                         }),
-                        icon: Icon(Icons.rotate_left),
+                        icon: const Icon(Icons.rotate_left),
                       ),
                       FilterChip(
                         selected: _cropToSquare,
-                        label: Text("Square crop"),
-                        avatar: Icon(Icons.crop_square),
+                        label: const Text("Square crop"),
+                        avatar: const Icon(Icons.crop_square),
                         onSelected: (value) => setState(() {
                           _cropToSquare = value;
                         }),
@@ -201,7 +207,7 @@ class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateM
                         onPressed: () => setState(() {
                           _rotationDegrees = (_rotationDegrees + 90) % 360;
                         }),
-                        icon: Icon(Icons.rotate_right),
+                        icon: const Icon(Icons.rotate_right),
                       ),
                     ],
                   ),
@@ -213,17 +219,17 @@ class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateM
                         values: _range,
                         onChangeEnd: (_) async {
                           if (_seekTarget == _controller.value.duration * _range.end) {
-                            _requestSeek(
-                                _controller.value.duration * _range.end - Duration(seconds: 1));
+                            _requestSeek(_controller.value.duration * _range.end -
+                                const Duration(seconds: 1));
                             if (_seekTarget < _controller.value.duration * _range.start) {
                               _seekTarget = _controller.value.duration * _range.start;
                             }
                           }
                           _play();
-                          setState(() {});
-                          await Future.delayed(Duration(milliseconds: 200));
-                          setState(() {});
+                          await Future.delayed(const Duration(milliseconds: 200));
+                          if (!mounted) return;
                           _editing = false;
+                          setState(() {});
                         },
                         onChangeStart: (_) {
                           _controller.pause();
@@ -242,18 +248,26 @@ class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateM
                           _range = values;
                           setState(() {});
                         }),
-                    if (!_editing && _ready)
-                      IgnorePointer(
-                        child: Slider(
-                          thumbColor: Theme.of(context).colorScheme.onSurface,
-                          activeColor: Colors.transparent,
-                          inactiveColor: Colors.transparent,
-                          value: _controller.value.position.inMilliseconds /
-                              _controller.value.duration.inMilliseconds,
-                          onChanged: (_) {},
-                          year2023: false,
-                        ),
-                      ),
+                    ValueListenableBuilder<VideoPlayerValue>(
+                      valueListenable: _controller,
+                      builder: (context, value, _) {
+                        if (_editing || !_ready) return const SizedBox.shrink();
+                        final durationMs = value.duration.inMilliseconds;
+                        if (durationMs <= 0) return const SizedBox.shrink();
+                        final progress =
+                            (value.position.inMilliseconds / durationMs).clamp(0.0, 1.0);
+                        return IgnorePointer(
+                          child: Slider(
+                            thumbColor: Theme.of(context).colorScheme.onSurface,
+                            activeColor: Colors.transparent,
+                            inactiveColor: Colors.transparent,
+                            value: progress,
+                            onChanged: (_) {},
+                            year2023: false,
+                          ),
+                        );
+                      },
+                    ),
                   ],
                 ),
                 Padding(
@@ -261,14 +275,14 @@ class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateM
                   child: FilledButton(
                     clipBehavior: Clip.antiAlias,
                     style: ButtonStyle(
-                      padding: WidgetStateProperty.all(EdgeInsets.zero),
+                      padding: WidgetStateProperty.all(const EdgeInsets.zero),
                     ),
                     onPressed: _exporting ? null : () => doCrop(),
                     child: Column(
                       children: [
-                        SizedBox(height: 8),
+                        const SizedBox(height: 8),
                         Text(AppLocalizations.of(context)!.done),
-                        SizedBox(height: 8),
+                        const SizedBox(height: 8),
                         if (_exporting)
                           StreamBuilder(
                               stream: service.progressStream,
@@ -296,7 +310,7 @@ class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateM
     if (_canSeek) {
       _canSeek = false;
       await _controller.seekTo(time);
-      await Future.delayed(Duration(milliseconds: 100));
+      await Future.delayed(const Duration(milliseconds: 100));
       _canSeek = true;
       if (_seekTarget != time) {
         _requestSeek(_seekTarget);
@@ -307,8 +321,9 @@ class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateM
   void _play() {
     _controller.play();
     _btnOpacity = 1;
-    setState(() {});
-    Future.delayed(Duration(seconds: 1)).then((_) {
+    if (mounted) setState(() {});
+    Future.delayed(const Duration(seconds: 1)).then((_) {
+      if (!mounted) return;
       _btnOpacity = 0;
       setState(() {});
     });
@@ -337,7 +352,7 @@ class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateM
         if (s.status == Status.SUCCESS) {
           break;
         } else if (s.status == Status.FAILED) {
-          print("Transcoding failed!");
+          debugPrint("Transcoding failed!");
           if (mounted) {
             showDialog(
                 context: context,

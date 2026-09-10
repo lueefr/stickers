@@ -60,6 +60,13 @@ class TextLayerState extends State<TextLayer> with TickerProviderStateMixin {
     WidgetsBinding.instance.addPostFrameCallback((_) => enableEditing());
   }
 
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
   void enableEditing() {
     showDialog(
       useRootNavigator: true,
@@ -88,6 +95,7 @@ class TextLayerState extends State<TextLayer> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    final fontSize = widget.text.fontSize * (FontsRegistry.sizeMultiplier(widget.text.fontName) ?? 1);
     final textStack = Stack(
       children: [
         Text(
@@ -95,7 +103,7 @@ class TextLayerState extends State<TextLayer> with TickerProviderStateMixin {
           textAlign: TextAlign.center,
           style: TextStyle(
             inherit: false,
-            fontSize: widget.text.fontSize * (FontsRegistry.sizeMultiplier(widget.text.fontName) ?? 1),
+            fontSize: fontSize,
             foreground: Paint()
               ..strokeJoin = StrokeJoin.round
               ..strokeCap = StrokeCap.round
@@ -110,7 +118,7 @@ class TextLayerState extends State<TextLayer> with TickerProviderStateMixin {
           textAlign: TextAlign.center,
           style: TextStyle(
             inherit: false,
-            fontSize: widget.text.fontSize * (FontsRegistry.sizeMultiplier(widget.text.fontName) ?? 1),
+            fontSize: fontSize,
             color: widget.text.textColor,
             fontFamily: widget.text.fontName,
           ),
@@ -167,7 +175,9 @@ class FontPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double paddingDiff = MediaQuery.of(context).textScaler.scale(max(15 * (font.sizeMultiplier - 1), 0)) / 2;
+    final textScaler = MediaQuery.of(context).textScaler;
+    final theme = Theme.of(context);
+    final double paddingDiff = textScaler.scale(max(15 * (font.sizeMultiplier - 1), 0)) / 2;
     return Column(
       children: [
         Container(
@@ -175,13 +185,11 @@ class FontPreview extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             color: active
-                ? (Theme.of(context).brightness == Brightness.light
-                    ? Theme.of(context).colorScheme.primary.withAlpha(100)
-                    : Theme.of(context).colorScheme.primary.withAlpha(50))
+                ? theme.colorScheme.primary.withAlpha(theme.brightness == Brightness.light ? 100 : 50)
                 : Colors.transparent,
           ),
           child: Baseline(
-              baseline: MediaQuery.of(context).textScaler.scale(15),
+              baseline: textScaler.scale(15),
               baselineType: TextBaseline.alphabetic,
               child: Text(
                 font.display ?? font.family,
@@ -190,7 +198,7 @@ class FontPreview extends StatelessWidget {
                 style: TextStyle(
                     color: Colors.white,
                     fontFamily: font.family,
-                    fontSize: MediaQuery.of(context).textScaler.scale(15 * font.sizeMultiplier)),
+                    fontSize: textScaler.scale(15 * font.sizeMultiplier)),
               )),
         ),
       ],

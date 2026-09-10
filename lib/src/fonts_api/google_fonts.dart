@@ -74,7 +74,7 @@ Future<void> downloadAndRegisterFont(WebFont font) async {
 }
 
 Future<void> downloadAndRegisterFontPreview(WebFont font) async {
-  print("Downloading font ${font.family}");
+  debugPrint("Downloading font ${font.family}");
   if (FontsRegistry.contains(font.family)) {
     if (FontsRegistry.get(font.family)?.previewFile != null) {
       return;

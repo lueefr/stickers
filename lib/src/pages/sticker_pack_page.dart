@@ -36,6 +36,9 @@ class StickerPackPage extends StatefulWidget {
 class StickerPackPageState extends State<StickerPackPage> {
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cellColor = Color.lerp(theme.colorScheme.primary, theme.colorScheme.surface, .7);
+    final shadowColor = theme.brightness == Brightness.light ? Colors.black26 : Colors.black12;
     return SafeArea(
       child: Column(
         children: [
@@ -107,15 +110,12 @@ class StickerPackPageState extends State<StickerPackPage> {
                       return Container(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(24),
-                          color: Color.lerp(Theme.of(context).colorScheme.primary,
-                              Theme.of(context).colorScheme.surface, .7),
+                          color: cellColor,
                           boxShadow: [
                             BoxShadow(
-                              offset: Offset(1, 1),
+                              offset: const Offset(1, 1),
                               blurRadius: 3,
-                              color: Theme.of(context).brightness == Brightness.light
-                                  ? Colors.black26
-                                  : Colors.black12,
+                              color: shadowColor,
                             )
                           ],
                         ),
@@ -129,6 +129,9 @@ class StickerPackPageState extends State<StickerPackPage> {
                                     File(widget.pack.stickers[index].source),
                                     width: double.infinity,
                                     height: double.infinity,
+                                    cacheWidth: 256,
+                                    cacheHeight: 256,
+                                    gaplessPlayback: true,
                                     fit: BoxFit.contain,
                                   ),
                                   onTap: () {
@@ -188,13 +191,13 @@ class StickerPackPageState extends State<StickerPackPage> {
                   Row(
                     children: [
                       ElevatedButton.icon(
-                        icon: Icon(Icons.share),
+                        icon: const Icon(Icons.share),
                         onPressed: () {
                           exportPack(widget.pack);
                         },
                         label: Text(AppLocalizations.of(context)!.export),
                       ),
-                      SizedBox(
+                      const SizedBox(
                         width: 8,
                       ),
                       Expanded(
@@ -234,7 +237,7 @@ class StickerPackPageState extends State<StickerPackPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: Icon(Icons.photo),
+              leading: const Icon(Icons.photo),
               title: Text("New image"),
               onTap: () {
                 Navigator.of(context).pop();
@@ -242,7 +245,7 @@ class StickerPackPageState extends State<StickerPackPage> {
               },
             ),
             ListTile(
-              leading: Icon(Icons.collections),
+              leading: const Icon(Icons.collections),
               title: Text("Multiple images"),
               subtitle: Text("Edit them one at a time"),
               onTap: () {
@@ -251,7 +254,7 @@ class StickerPackPageState extends State<StickerPackPage> {
               },
             ),
             ListTile(
-              leading: Icon(Icons.auto_fix_high),
+              leading: const Icon(Icons.auto_fix_high),
               title: Text("Start with existing sticker"),
               onTap: () {
                 Navigator.of(context).pop();
@@ -273,7 +276,7 @@ class StickerPackPageState extends State<StickerPackPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: Icon(Icons.video_library),
+              leading: const Icon(Icons.video_library),
               title: Text("Video"),
               subtitle: Text("Trim, crop and rotate"),
               onTap: () {
@@ -282,7 +285,7 @@ class StickerPackPageState extends State<StickerPackPage> {
               },
             ),
             ListTile(
-              leading: Icon(Icons.gif_box),
+              leading: const Icon(Icons.gif_box),
               title: Text("GIF"),
               subtitle: Text("Create an animated sticker from a GIF"),
               onTap: () {
@@ -396,8 +399,8 @@ class StickerPackPageState extends State<StickerPackPage> {
         builder: (_) => AlertDialog(
           content: Row(
             children: [
-              CircularProgressIndicator(),
-              SizedBox(width: 20),
+              const CircularProgressIndicator(),
+              const SizedBox(width: 20),
               Expanded(child: Text("Creating animated sticker...")),
             ],
           ),
@@ -437,7 +440,8 @@ class StickerPackPageState extends State<StickerPackPage> {
         );
         return;
       }
-      addToPack(widget.pack, index, best);
+      await addToPack(widget.pack, index, best);
+      if (!mounted) return;
       setState(() {});
     } on Exception catch (e) {
       if (mounted && Navigator.of(context).canPop()) {

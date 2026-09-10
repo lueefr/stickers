@@ -49,6 +49,9 @@ class ImageStickerLayerState extends State<ImageStickerLayer> {
           child: Image.file(
             File(widget.image.source),
             width: widget.image.width,
+            // Gallery photos can be huge; decode at ~3x the display width.
+            cacheWidth: 780,
+            gaplessPlayback: true,
             fit: BoxFit.contain,
           ),
         ),

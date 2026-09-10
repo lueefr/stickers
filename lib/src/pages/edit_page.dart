@@ -52,12 +52,15 @@ class _EditPageState extends State<EditPage> {
   Color _brushColor = Colors.white;
   double _brushSize = 15;
   Offset _brushPos = Offset(0, 0);
-  Color? _pickedColor;
+
   final Curve _curve = Curves.ease;
   final List<UndoEntry> _undo = [];
   final double maxWidth = 200;
-  String? _message;
-  double? _exportProgress;
+  final ValueNotifier<String?> _exportMessage = ValueNotifier<String?>(null);
+  final ValueNotifier<double?> _exportProgress = ValueNotifier<double?>(null);
+  // Built once: recreating this on every brush stroke would churn the image
+  // cache and drop frames while drawing.
+  Widget? _basePicture;
 
   /// The sticker is 512x512 as opposed to the canvas, which is why we need a scale factor
   double scaleFactor = 0;
@@ -70,17 +73,21 @@ class _EditPageState extends State<EditPage> {
     super.initState();
     _source = File(widget.imagePath);
     if (widget.mediaType == MediaType.video) {
-      _controller = VideoPlayerController.file(
+      final controller = VideoPlayerController.file(
         _source,
         viewType: VideoViewType.textureView,
         videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
       );
-      _controller.setLooping(true);
-      _controller.setVolume(0);
-      _controller.initialize().then((_) {
-        _controller.play();
+      _controller = controller;
+      controller.setLooping(true);
+      controller.setVolume(0);
+      controller.initialize().then((_) {
+        if (!mounted) return;
+        controller.play();
         setState(() {});
       });
+    } else {
+      _basePicture = Image.file(_source, fit: BoxFit.fill, gaplessPlayback: true);
     }
     //_sticker = _pack.stickers[widget.index];
   }
@@ -88,7 +95,16 @@ class _EditPageState extends State<EditPage> {
   final GlobalKey _rbKey = GlobalKey();
   final GlobalKey _overlayKey = GlobalKey();
   bool _exporting = false;
-  late VideoPlayerController _controller;
+  VideoPlayerController? _controller;
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    _controller = null;
+    _exportMessage.dispose();
+    _exportProgress.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -125,68 +141,17 @@ class _EditPageState extends State<EditPage> {
                 firstCurve: _curve,
                 secondCurve: _curve,
                 firstChild: Container(),
-                secondChild: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: colors.getRange(0, columns).map((c) {
-                        return ColorButton(
-                          c,
-                          size: buttonSize,
-                          onTap: () => _setColor(c),
-                          active: c == _brushColor,
-                        );
-                      }).toList(),
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: colors
-                          .getRange(columns, colors.length)
-                          .map((c) => ColorButton(
-                                c,
-                                size: buttonSize,
-                                onTap: () => _setColor(c),
-                                active: c == _brushColor,
-                              ))
-                          .toList(),
-                    ),
-                    SizedBox(
-                      height: 10,
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      child: Row(
-                        children: [
-                          Container(
-                            decoration: BoxDecoration(color: _brushColor, borderRadius: BorderRadius.circular(10)),
-                            height: 7,
-                            width: 7,
-                          ),
-                          Expanded(
-                            child: Slider(
-                                activeColor: _brushColor,
-                                min: 7,
-                                max: 150,
-                                value: _brushSize,
-                                onChanged: (value) {
-                                  setState(() {
-                                    _brushSize = value;
-                                  });
-                                }),
-                          ),
-                          Container(
-                            decoration: BoxDecoration(color: _brushColor, borderRadius: BorderRadius.circular(25)),
-                            height: 25,
-                            width: 25,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                secondChild: _BrushControls(
+                  buttonSize: buttonSize,
+                  columns: columns,
+                  initialColor: _brushColor,
+                  initialSize: _brushSize,
+                  onColorChanged: (c) => _brushColor = c,
+                  onSizeChanged: (s) => _brushSize = s,
+                  onPickCustomColor: _pickCustomColor,
                 ),
                 crossFadeState: _drawing ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-                duration: Duration(milliseconds: 200));
+                duration: const Duration(milliseconds: 200));
 
             final drawButton = AnimatedCrossFade(
                 firstChild: Column(
@@ -199,7 +164,7 @@ class _EditPageState extends State<EditPage> {
                         });
                       },
                       label: Text(AppLocalizations.of(context)!.draw),
-                      icon: Icon(Icons.draw),
+                      icon: const Icon(Icons.draw),
                     ),
                   ],
                 ),
@@ -218,13 +183,13 @@ class _EditPageState extends State<EditPage> {
                           });
                         },
                         label: Text(AppLocalizations.of(context)!.done),
-                        icon: Icon(Icons.check),
+                        icon: const Icon(Icons.check),
                       ),
                     ),
                   ],
                 ),
                 crossFadeState: _drawing ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-                duration: Duration(milliseconds: 200));
+                duration: const Duration(milliseconds: 200));
 
             var editButtons = Padding(
               padding: const EdgeInsets.only(bottom: 12),
@@ -258,18 +223,18 @@ class _EditPageState extends State<EditPage> {
                         setState(() {});
                       },
                       label: Text(AppLocalizations.of(context)!.addText),
-                      icon: Icon(Icons.format_size),
+                      icon: const Icon(Icons.format_size),
                     ),
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: FilledButton.tonalIcon(
                       onPressed: _addImageLayer,
                       label: Text("Add image"),
-                      icon: Icon(Icons.add_photo_alternate),
+                      icon: const Icon(Icons.add_photo_alternate),
                     ),
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: drawButton,
                   ),
@@ -277,6 +242,7 @@ class _EditPageState extends State<EditPage> {
               ),
             );
 
+            final videoController = _controller;
             final imageDisplay = Container(
               decoration: BoxDecoration(borderRadius: BorderRadius.circular(24)),
               clipBehavior: Clip.antiAlias,
@@ -298,7 +264,7 @@ class _EditPageState extends State<EditPage> {
                               scaleFactor = size.width / 512;
                               if (size.aspectRatio != 1) {
                                 // That should never happen
-                                print("Aspect ratio of sticker should be 1");
+                                debugPrint("Aspect ratio of sticker should be 1");
                               }
                               WidgetsBinding.instance.addPostFrameCallback(
                                 (timeStamp) => setState(() {}),
@@ -313,13 +279,13 @@ class _EditPageState extends State<EditPage> {
 child: Stack(children: [
 if (widget.mediaType == MediaType.picture)
 Positioned.fill(
-child: Image.file(_source, fit: BoxFit.fill),
+child: _basePicture!,
 )
-else
+else if (videoController != null)
                                 Center(
                                   child: AspectRatio(
-                                    aspectRatio: _controller.value.aspectRatio,
-                                    child: VideoPlayer(_controller),
+                                    aspectRatio: videoController.value.aspectRatio,
+                                    child: VideoPlayer(videoController),
                                   ),
                                 ),
                               Positioned.fill(
@@ -329,11 +295,7 @@ else
                                     fit: StackFit.expand,
                                     children: _layers
                                         .map(
-                                          (e) => Positioned(
-                                            top: 0,
-                                            bottom: 0,
-                                            left: 0,
-                                            right: 0,
+                                          (e) => Positioned.fill(
                                             child: e,
                                           ),
                                         )
@@ -341,41 +303,43 @@ else
                                   ),
                                 ),
                               ),
-                              if (_message != null)
-                                Positioned(
-                                  top: 0,
-                                  bottom: 0,
-                                  left: 0,
-                                  right: 0,
-                                  child: Container(
-                                    color: Theme.of(context).colorScheme.surface.withAlpha(200),
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      crossAxisAlignment: CrossAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          AppLocalizations.of(context)!.exporting,
-                                          style: Theme.of(context).textTheme.displaySmall,
-                                        ),
-                                        SizedBox(
-                                          height: 12,
-                                        ),
-                                        SizedBox(
-                                          height: 64,
-                                          width: 64,
-                                          child: CircularProgressIndicator(
-                                            year2023: false,
-                                            value: _exportProgress,
+                              Positioned.fill(
+                                child: ValueListenableBuilder<String?>(
+                                  valueListenable: _exportMessage,
+                                  builder: (context, message, _) {
+                                    if (message == null) return const SizedBox.shrink();
+                                    return Container(
+                                      color: Theme.of(context).colorScheme.surface.withAlpha(200),
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        crossAxisAlignment: CrossAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            AppLocalizations.of(context)!.exporting,
+                                            style: Theme.of(context).textTheme.displaySmall,
                                           ),
-                                        ),
-                                        Text(
-                                          _message ?? "",
-                                          textAlign: TextAlign.center,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                )
+                                          const SizedBox(height: 12),
+                                          SizedBox(
+                                            height: 64,
+                                            width: 64,
+                                            child: ValueListenableBuilder<double?>(
+                                              valueListenable: _exportProgress,
+                                              builder: (context, progress, _) => CircularProgressIndicator(
+                                                year2023: false,
+                                                value: progress,
+                                              ),
+                                            ),
+                                          ),
+                                          Text(
+                                            message,
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                              )
                             ]),
                           ),
                         ),
@@ -392,7 +356,7 @@ else
               secondCurve: _curve,
               firstChild: Container(),
               secondChild: Padding(
-                padding: isHorizontal ? EdgeInsets.zero : EdgeInsets.only(top: 12),
+                padding: isHorizontal ? EdgeInsets.zero : const EdgeInsets.only(top: 12),
                 child: Row(children: [
                   Expanded(
                     child: FilledButton.tonalIcon(
@@ -404,14 +368,14 @@ else
                           : () {
                               final layer =
                                   _layers.whereType<DrawLayer>().lastWhere((layer) => layer.painter.strokes.isNotEmpty);
-                              _undo.add(UndoEntry(layer.painter.strokes.removeLast(), layer.painter));
+                              _undo.add(UndoEntry(layer.painter.removeLastStroke(), layer.painter));
                               setState(() {});
                             },
                       label: Text(AppLocalizations.of(context)!.undo),
-                      icon: Icon(Icons.undo),
+                      icon: const Icon(Icons.undo),
                     ),
                   ),
-                  SizedBox(
+                  const SizedBox(
                     width: 12,
                   ),
                   Expanded(
@@ -421,21 +385,21 @@ else
                           : () {
                               setState(() {
                                 final entry = _undo.removeLast();
-                                entry.painter.strokes.add(entry.stroke);
+                                           entry.painter.addStroke(entry.stroke);
                               });
                             },
                       label: Text(AppLocalizations.of(context)!.redo),
-                      icon: Icon(Icons.redo),
+                      icon: const Icon(Icons.redo),
                     ),
                   ),
                 ]),
               ),
               crossFadeState: _drawing ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-              duration: Duration(milliseconds: 200),
+              duration: const Duration(milliseconds: 200),
             );
 
             var doneButton = FilledButton.icon(
-              icon: Icon(Icons.done),
+              icon: const Icon(Icons.done),
               onPressed: _exporting
                   ? null
                   : () async {
@@ -449,7 +413,7 @@ else
                 padding: const EdgeInsets.all(8.0),
                 child: Center(
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: 1024),
+                    constraints: const BoxConstraints(maxWidth: 1024),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -457,7 +421,7 @@ else
                           constraints: BoxConstraints(maxWidth: halfWidth),
                           child: imageDisplay,
                         ),
-                        SizedBox(
+                        const SizedBox(
                           width: 12,
                         ),
                         ConstrainedBox(
@@ -471,7 +435,7 @@ else
                                   editButtons,
                                   colorButtons,
                                   undoButtons,
-                                  if (_drawing) SizedBox(height: 12),
+                                  if (_drawing) const SizedBox(height: 12),
                                   doneButton,
                                 ],
                               ),
@@ -489,7 +453,7 @@ else
               child: Center(
                 child: SingleChildScrollView(
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: 512),
+                    constraints: const BoxConstraints(maxWidth: 512),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -498,7 +462,7 @@ else
                         colorButtons,
                         imageDisplay,
                         undoButtons,
-                        SizedBox(height: 12),
+                        const SizedBox(height: 12),
                         doneButton,
                       ],
                     ),
@@ -534,7 +498,7 @@ else
       } else {
         data = await exportAnimatedSticker(overlay, context);
       }
-      addToPack(widget.pack, widget.index, data);
+      await addToPack(widget.pack, widget.index, data);
       if (!context.mounted) return;
       for (var i = 0; i < widget.popCount && Navigator.of(context).canPop(); i++) {
         Navigator.of(context).pop();
@@ -551,6 +515,8 @@ else
             });
       }
     } finally {
+      _exportMessage.value = null;
+      _exportProgress.value = null;
       if (mounted) {
         setState(() {
           _exporting = false;
@@ -579,91 +545,95 @@ else
     double quality = 60;
     int fps = 24;
 
-    for (int attempt = 0; attempt < 3; attempt++) {
-      if (context.mounted) {
-        switch (attempt) {
-          case 0:
-            _message = AppLocalizations.of(context)!.firstAttempt;
-          case 1:
-            _message = AppLocalizations.of(context)!.secondAttempt;
-          case 2:
-            _message = AppLocalizations.of(context)!.thirdAttempt;
-        }
-      }
-      setState(() {});
-      var config = WebPConfig(
-        lossless: false,
-        quality: quality,
-        alphaCompression: 1,
-        method: 4,
-      );
-      await service.start(
-          videoFile: _source.path, overlayFile: out.path, outputFile: output.path, config: config, fps: fps);
-      await for (final update in service.progressStream) {
-        if (update.status == Status.SUCCESS) {
-          break;
-        } else if (update.status == Status.RUNNING) {
-          _exportProgress = update.progress;
-          setState(() {});
-        } else if (update.status == Status.FAILED) {
-          if (context.mounted) {
-            showDialog(
-              context: context,
-              builder: (context) {
-                return ErrorDialog(
-                  title: AppLocalizations.of(context)!.exportWebpFailed,
-                  message: AppLocalizations.of(context)!.exportWebpFailedMsg,
-                );
-              },
-            );
+    try {
+      for (int attempt = 0; attempt < 3; attempt++) {
+        if (context.mounted) {
+          switch (attempt) {
+            case 0:
+              _exportMessage.value = AppLocalizations.of(context)!.firstAttempt;
+            case 1:
+              _exportMessage.value = AppLocalizations.of(context)!.secondAttempt;
+            case 2:
+              _exportMessage.value = AppLocalizations.of(context)!.thirdAttempt;
           }
         }
-      }
-      print("Exported WebP in ${sw.elapsedMilliseconds}ms");
-      data = await output.readAsBytes();
-      print("Output size: ${data.lengthInBytes / 1024}kiB");
-      if (data.lengthInBytes / 1024 < 500) {
-        break;
-      } else {
-        print("Result is ${data.lengthInBytes / 500 / 1024} times too big");
-        if (data.lengthInBytes / 1024 > 550) {
-          // If the sticker is really too large, the only solution is to drop frames
-          fps = (fps / (data.lengthInBytes / 1024) * 550).round();
+        var config = WebPConfig(
+          lossless: false,
+          quality: quality,
+          alphaCompression: 1,
+          method: 4,
+        );
+        await service.start(
+            videoFile: _source.path, overlayFile: out.path, outputFile: output.path, config: config, fps: fps);
+        await for (final update in service.progressStream) {
+          if (update.status == Status.SUCCESS) {
+            break;
+          } else if (update.status == Status.RUNNING) {
+            _exportProgress.value = update.progress;
+          } else if (update.status == Status.FAILED) {
+            if (context.mounted) {
+              showDialog(
+                context: context,
+                builder: (context) {
+                  return ErrorDialog(
+                    title: AppLocalizations.of(context)!.exportWebpFailed,
+                    message: AppLocalizations.of(context)!.exportWebpFailedMsg,
+                  );
+                },
+              );
+            }
+          }
         }
-        quality -= 20;
-        print("New configuration: q=$quality fps=$fps");
+        debugPrint("Exported WebP in ${sw.elapsedMilliseconds}ms");
+        data = await output.readAsBytes();
+        debugPrint("Output size: ${data.lengthInBytes / 1024}kiB");
+        if (data.lengthInBytes / 1024 < 500) {
+          break;
+        } else {
+          debugPrint("Result is ${data.lengthInBytes / 500 / 1024} times too big");
+          if (data.lengthInBytes / 1024 > 550) {
+            // If the sticker is really too large, the only solution is to drop frames
+            fps = (fps / (data.lengthInBytes / 1024) * 550).round();
+          }
+          quality -= 20;
+          debugPrint("New configuration: q=$quality fps=$fps");
+        }
       }
+      if (data!.lengthInBytes / 1024 > 500) {
+        if (!context.mounted) throw Exception();
+        Navigator.of(context).pop();
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(AppLocalizations.of(context)!.stickerTooLarge),
+            content: Text(AppLocalizations.of(context)!.stickerTooLargeMsg),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: Text(
+                  AppLocalizations.of(context)!.ok,
+                ),
+              )
+            ],
+          ),
+        );
+        throw Exception("Sticker too large");
+      }
+      return data;
+    } finally {
+      service.dispose();
     }
-    if (data!.lengthInBytes / 1024 > 500) {
-      if (!context.mounted) throw Exception();
-      Navigator.of(context).pop();
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text(AppLocalizations.of(context)!.stickerTooLarge),
-          content: Text(AppLocalizations.of(context)!.stickerTooLargeMsg),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: Text(
-                AppLocalizations.of(context)!.ok,
-              ),
-            )
-          ],
-        ),
-      );
-      throw Exception("Sticker too large");
-    }
-    return data;
   }
 
   void onMatrixUpdate(Matrix4 translationDeltaMatrix, Matrix4 scaleDeltaMatrix, Matrix4 rotationDeltaMatrix) {
     if (_drawing) {
       _brushPos = Offset(_brushPos.dx + translationDeltaMatrix.row0.w, _brushPos.dy + translationDeltaMatrix.row1.w);
-      (_layers.last as DrawLayer).painter.strokes.last.points.add(_brushPos / scaleFactor);
-      setState(() {});
+      final layer = _layers.lastOrNull;
+      // The painter repaints itself through its repaint notifier, so drawing
+      // doesn't rebuild the whole editor page on every pointer move.
+      if (layer is DrawLayer) layer.painter.addPoint(_brushPos / scaleFactor);
       return;
     }
 
@@ -688,8 +658,8 @@ else
         _layers.add(DrawLayer()..painter.scaleFactor = scaleFactor);
       }
       final painter = (_layers.last as DrawLayer).painter;
-
-      painter.strokes.add(Stroke(_brushColor, _brushSize));
+      painter.scaleFactor = scaleFactor;
+      painter.addStroke(Stroke(_brushColor, _brushSize));
       setState(() {});
       return;
     }
@@ -746,16 +716,121 @@ else
     setState(() {});
   }
 
-  void _setColor(Color c) async {
+  Future<Color?> _pickCustomColor() {
+    final renderObject = _rbKey.currentContext?.findRenderObject();
+    if (renderObject is! RenderRepaintBoundary) return Future.value(null);
+    return showDialog<Color>(context: context, builder: (context) => EyedropperDialog(renderObject));
+  }
+}
+
+/// Brush color + size controls.
+///
+/// A separate widget with its own [State] so dragging the size slider or
+/// tapping a color only rebuilds these controls instead of the whole editor
+/// page (canvas, video, layers) on every change.
+class _BrushControls extends StatefulWidget {
+  final double buttonSize;
+  final int columns;
+  final Color initialColor;
+  final double initialSize;
+  final ValueChanged<Color> onColorChanged;
+  final ValueChanged<double> onSizeChanged;
+  final Future<Color?> Function() onPickCustomColor;
+
+  const _BrushControls({
+    required this.buttonSize,
+    required this.columns,
+    required this.initialColor,
+    required this.initialSize,
+    required this.onColorChanged,
+    required this.onSizeChanged,
+    required this.onPickCustomColor,
+  });
+
+  @override
+  State<_BrushControls> createState() => _BrushControlsState();
+}
+
+class _BrushControlsState extends State<_BrushControls> {
+  late Color _color;
+  late double _size;
+
+  @override
+  void initState() {
+    super.initState();
+    _color = widget.initialColor;
+    _size = widget.initialSize;
+  }
+
+  Future<void> _setColor(Color c) async {
     if (c == Colors.transparent) {
-      _pickedColor = await showDialog(
-          context: context,
-          builder: (context) => EyedropperDialog(_rbKey.currentContext!.findRenderObject() as RenderRepaintBoundary));
-      c = _pickedColor!;
+      final picked = await widget.onPickCustomColor();
+      if (picked == null) return;
+      c = picked;
     }
-    setState(() {
-      _brushColor = c;
-    });
+    setState(() => _color = c);
+    widget.onColorChanged(c);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: colors.getRange(0, widget.columns).map((c) {
+            return ColorButton(
+              c,
+              size: widget.buttonSize,
+              onTap: () => _setColor(c),
+              active: c == _color,
+            );
+          }).toList(),
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: colors
+              .getRange(widget.columns, colors.length)
+              .map((c) => ColorButton(
+                    c,
+                    size: widget.buttonSize,
+                    onTap: () => _setColor(c),
+                    active: c == _color,
+                  ))
+              .toList(),
+        ),
+        const SizedBox(height: 10),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              Container(
+                decoration: BoxDecoration(color: _color, borderRadius: BorderRadius.circular(10)),
+                height: 7,
+                width: 7,
+              ),
+              Expanded(
+                child: Slider(
+                    activeColor: _color,
+                    min: 7,
+                    max: 150,
+                    value: _size,
+                    onChanged: (value) {
+                      setState(() => _size = value);
+                      widget.onSizeChanged(value);
+                    }),
+              ),
+              Container(
+                decoration: BoxDecoration(color: _color, borderRadius: BorderRadius.circular(25)),
+                height: 25,
+                width: 25,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }
 

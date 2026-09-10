@@ -8,6 +8,15 @@ import 'package:stickers/src/pages/crop_page.dart';
 import 'package:stickers/src/pages/default_page.dart';
 import 'package:stickers/src/widgets/sticker_pack_preview_card.dart';
 
+// dart format off
+const _grayscaleFilter = ColorFilter.matrix(<double>[
+  0.2126, 0.7152, 0.0722, 0, 0,
+  0.2126, 0.7152, 0.0722, 0, 0,
+  0.2126, 0.7152, 0.0722, 0, 0,
+  0, 0, 0, 1, 0,
+]);
+// dart format on
+
 class SelectPackPage extends StatefulWidget {
   final SharedMedia media;
 
@@ -34,46 +43,19 @@ class _SelectPackPageState extends State<SelectPackPage> {
         child: const Icon(Icons.add),
       ),
       title: AppLocalizations.of(context)!.selectStickerPack,
-      child: ListView.separated(
-        separatorBuilder: (context, index) => Container(),
+      child: ListView.builder(
         itemBuilder: (context, index) {
           bool disabled = packs[index].animated || packs[index].stickers.length >= 30;
-          debugPrint("disabled: $disabled");
+          // The filter is only applied to disabled cards: even a no-op
+          // ColorFilter forces the whole card through an expensive saveLayer.
+          final Widget card = IgnorePointer(
+            child: StickerPackPreviewCard(packs[index], () {
+              setState(() {});
+            }),
+          );
           return Stack(
             children: [
-// dart format off
-              ColorFiltered(
-                colorFilter: disabled
-                    ? ColorFilter.matrix(<double>[
-                        0.2126,
-                        0.7152,
-                        0.0722,
-                        0,
-                        0,
-                        0.2126,
-                        0.7152,
-                        0.0722,
-                        0,
-                        0,
-                        0.2126,
-                        0.7152,
-                        0.0722,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        1,
-                        0
-                      ])
-                    : ColorFilter.matrix(<double>[1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0]),
-                child: IgnorePointer(
-                  child: StickerPackPreviewCard(packs[index], () {
-                    setState(() {});
-                  }),
-                ),
-              ),
-// dart format on
+              disabled ? ColorFiltered(colorFilter: _grayscaleFilter, child: card) : card,
               Positioned(
                 top: 0,
                 bottom: 0,

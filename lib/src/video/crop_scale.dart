@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'common.dart';
@@ -36,7 +37,7 @@ class CropAndScaleService {
   }
 
   void _onError(Object error) {
-    print("Error on EventChannel: $error");
+    debugPrint("Error on EventChannel: $error");
     _progressController.add(Progress(status: Status.FAILED));
   }
 
@@ -58,7 +59,7 @@ class CropAndScaleService {
         'cropToSquare': cropToSquare.toString(),
       });
     } on PlatformException catch (e) {
-      print("Failed to start transcoding: '${e.message}'.");
+      debugPrint("Failed to start transcoding: '${e.message}'.");
     }
   }
 
@@ -66,7 +67,7 @@ class CropAndScaleService {
     try {
       await _methodChannel.invokeMethod('cancelTrim');
     } on PlatformException catch (e) {
-      print("Failed to cancel transcoding: '${e.message}'.");
+      debugPrint("Failed to cancel transcoding: '${e.message}'.");
     }
   }
 

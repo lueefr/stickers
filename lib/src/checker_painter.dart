@@ -15,13 +15,17 @@ class CheckerPainter extends CustomPainter {
       : fg = fg ?? defaultForeground(context),
         bg = bg ?? defaultBackground(context);
 
-  static Color defaultForeground(BuildContext context) => Theme.of(context).brightness == Brightness.light
-      ? Color.lerp(Theme.of(context).colorScheme.primary, Theme.of(context).colorScheme.surface, .8)!
-      : Color.lerp(Theme.of(context).colorScheme.primary, Theme.of(context).colorScheme.surface, .9)!;
+  static Color defaultForeground(BuildContext context) {
+    final theme = Theme.of(context);
+    return Color.lerp(theme.colorScheme.primary, theme.colorScheme.surface,
+        theme.brightness == Brightness.light ? .8 : .9)!;
+  }
 
-  static Color defaultBackground(BuildContext context) => Theme.of(context).brightness == Brightness.light
-      ? Color.lerp(Theme.of(context).colorScheme.primary, Theme.of(context).colorScheme.surface, .9)!
-      : Color.lerp(Theme.of(context).colorScheme.primary, Theme.of(context).colorScheme.surface, .95)!;
+  static Color defaultBackground(BuildContext context) {
+    final theme = Theme.of(context);
+    return Color.lerp(theme.colorScheme.primary, theme.colorScheme.surface,
+        theme.brightness == Brightness.light ? .9 : .95)!;
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -52,17 +56,20 @@ class CheckerPainter extends CustomPainter {
 
     // The canvas is clipped to the widget bounds anyway, so iterating over
     // the rect is enough and works no matter where the widget is on screen.
+    // All squares are batched into a single path so the whole pattern paints
+    // in one draw call instead of hundreds.
     final maxX = rect.right;
     final maxY = rect.bottom;
+    final Path squares = Path();
 
     int row = 0;
     for (double y = max(rect.top, 0); y < maxY; y += size) {
       for (double x = max(rect.left, 0) + row * size; x < maxX; x += size * 2) {
-        Rect r = Rect.fromLTWH(x, y, size, size);
-        canvas.drawRect(r, checkerPaint);
+        squares.addRect(Rect.fromLTWH(x, y, size, size));
       }
       row++;
       row &= 1;
     }
+    canvas.drawPath(squares, checkerPaint);
   }
 }

@@ -178,8 +178,7 @@ class StickerPacksPageState extends State<StickerPacksPage> {
                 ],
               ),
             )
-          : ListView.separated(
-              separatorBuilder: (context, index) => Container(),
+          : ListView.builder(
               itemBuilder: (context, index) => StickerPackPreviewCard(
                 packs[index],
                 () {
