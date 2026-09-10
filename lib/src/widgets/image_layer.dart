@@ -17,7 +17,11 @@ class EditorImageLayerData {
 
 class ImageStickerLayer extends StatefulWidget implements EditorLayer {
   final EditorImageLayerData image;
-  ImageStickerLayerState? state;
+
+  /// Owned by this widget instance, so the editor can push transform updates
+  /// into the mounted state without going through a [GlobalKey]. It is kept
+  /// final because widgets have to stay immutable.
+  final ImageStickerLayerState state = ImageStickerLayerState();
   final Function(ImageStickerLayer)? onDelete;
 
   ImageStickerLayer(
@@ -27,13 +31,10 @@ class ImageStickerLayer extends StatefulWidget implements EditorLayer {
   });
 
   @override
-  State<ImageStickerLayer> createState() {
-    state = ImageStickerLayerState();
-    return state!;
-  }
+  State<ImageStickerLayer> createState() => state;
 
   void update(Matrix4 matrix) {
-    state?.update(matrix);
+    state.update(matrix);
   }
 }
 
@@ -60,6 +61,9 @@ class ImageStickerLayerState extends State<ImageStickerLayer> {
   }
 
   void update(Matrix4 matrix) {
+    // The editor can keep pushing transform updates to a layer that is not
+    // mounted (or is already disposed), and such a state cannot rebuild.
+    if (!mounted) return;
     widget.image.transform = matrix;
     setState(() {});
   }

@@ -47,8 +47,8 @@ Future<GoogleFontsReply> getFonts({String? family, String? category}) async {
   }
   Uri uri = Uri.parse(apiURL).replace(queryParameters: {
     "key": fontsKey,
-    if (family != null) "family": family,
-    if (category != null) "category": category,
+    "family": ?family,
+    "category": ?category,
   });
   final response = await get(uri);
   await fontsListCache.create(recursive: true);

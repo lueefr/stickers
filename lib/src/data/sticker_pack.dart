@@ -90,7 +90,7 @@ class StickerPack {
     );
   }
 
-  setTray(String source) {
+  void setTray(String source) {
     Directory parent = Directory("$packsDir/$id/");
     File output = File("$packsDir/$id/tray_${DateTime.now().millisecondsSinceEpoch}.webp");
     if (!parent.existsSync()) parent.createSync(recursive: true);

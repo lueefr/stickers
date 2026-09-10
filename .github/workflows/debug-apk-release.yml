@@ -74,8 +74,10 @@ jobs:
         run: flutter gen-l10n
 
       - name: Analyze
-        # The inherited codebase still has warning/info lint debt. Analyzer
-        # errors remain fatal, and the APK build below also compiles all code.
+        # The tree is currently lint clean, but warnings and infos stay
+        # non-fatal so a new lint introduced by a Flutter upgrade cannot block
+        # a release build. Analyzer errors stay fatal, and the APK build below
+        # compiles every source file as well.
         run: flutter analyze --no-fatal-warnings --no-fatal-infos
 
       - name: Run tests

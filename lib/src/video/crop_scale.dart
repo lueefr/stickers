@@ -20,11 +20,7 @@ class CropAndScaleService {
 
   void _onProgress(dynamic data) {
     if (data is Map) {
-      final statusString = data['status'] as String?;
-      final status = Status.values.firstWhere(
-            (e) => e.toString() == 'Status.$statusString',
-        orElse: () => Status.IDLE,
-      );
+      final status = Status.fromName(data['status'] as String?);
 
       final progress = Progress(
         status: status,
@@ -38,7 +34,7 @@ class CropAndScaleService {
 
   void _onError(Object error) {
     debugPrint("Error on EventChannel: $error");
-    _progressController.add(Progress(status: Status.FAILED));
+    _progressController.add(Progress(status: Status.failed));
   }
 
   Future<void> start({

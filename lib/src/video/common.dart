@@ -1,5 +1,20 @@
 // Enums and classes to mirror the Kotlin side
-enum Status { IDLE, RUNNING, SUCCESS, FAILED, CANCELLED }
+enum Status {
+  idle,
+  running,
+  success,
+  failed,
+  cancelled;
+
+  /// Parses the status name reported by the platform channel.
+  ///
+  /// The Kotlin side declares its enums in `SCREAMING_CASE`, so the lookup
+  /// ignores case instead of mirroring the constant names here.
+  static Status fromName(String? name) => Status.values.firstWhere(
+        (e) => e.name.toUpperCase() == name?.toUpperCase(),
+        orElse: () => Status.idle,
+      );
+}
 
 class Progress {
   final Status status;
@@ -8,7 +23,7 @@ class Progress {
   final int totalFrames;
 
   Progress({
-    this.status = Status.IDLE,
+    this.status = Status.idle,
     this.progress = 0.0,
     this.currentFrame = 0,
     this.totalFrames = 0,

@@ -22,13 +22,8 @@ class OverlayAndEncodeService {
   /// Handles incoming data from the native EventChannel.
   void _onProgress(dynamic data) {
     if (data is Map) {
-      final statusString = data['status'] as String?;
-
       // Safely parse the status string into an enum.
-      final status = Status.values.firstWhere(
-        (e) => e.name == statusString,
-        orElse: () => Status.IDLE,
-      );
+      final status = Status.fromName(data['status'] as String?);
 
       final progress = Progress(
         status: status,
@@ -44,7 +39,7 @@ class OverlayAndEncodeService {
   void _onError(Object error) {
     // ignore: avoid_print
     print("Error on EventChannel: $error");
-    _progressController.add(Progress(status: Status.FAILED));
+    _progressController.add(Progress(status: Status.failed));
   }
 
   /// Calls the native method to start the overlay and encoding process.
@@ -71,7 +66,7 @@ class OverlayAndEncodeService {
     } on PlatformException catch (e) {
       // ignore: avoid_print
       print("Failed to start overlay process: '${e.message}'.");
-      _progressController.add(Progress(status: Status.FAILED));
+      _progressController.add(Progress(status: Status.failed));
     }
   }
 

@@ -141,7 +141,11 @@ class StickerPackPageState extends State<StickerPackPage> {
                                     ).then(
                                       (action) {
                                         if (action == "edit") {
-                                          Navigator.of(context)
+                                          // The dialog can rebuild (or drop) this grid cell
+                                          // while it is open, so navigate from the page's own
+                                          // context instead of the cell one.
+                                          if (!mounted) return;
+                                          Navigator.of(this.context)
                                               .pushNamed(
                                                 "/edit",
                                                 arguments: EditArguments(

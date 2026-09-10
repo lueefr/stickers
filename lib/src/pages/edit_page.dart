@@ -325,7 +325,6 @@ else if (videoController != null)
                                             child: ValueListenableBuilder<double?>(
                                               valueListenable: _exportProgress,
                                               builder: (context, progress, _) => CircularProgressIndicator(
-                                                year2023: false,
                                                 value: progress,
                                               ),
                                             ),
@@ -496,6 +495,7 @@ else if (videoController != null)
       if (widget.mediaType == MediaType.picture) {
         data = (await ImageEditor.editFileImage(file: _source, imageEditorOption: option))!;
       } else {
+        if (!context.mounted) return;
         data = await exportAnimatedSticker(overlay, context);
       }
       await addToPack(widget.pack, widget.index, data);
@@ -566,11 +566,11 @@ else if (videoController != null)
         await service.start(
             videoFile: _source.path, overlayFile: out.path, outputFile: output.path, config: config, fps: fps);
         await for (final update in service.progressStream) {
-          if (update.status == Status.SUCCESS) {
+          if (update.status == Status.success) {
             break;
-          } else if (update.status == Status.RUNNING) {
+          } else if (update.status == Status.running) {
             _exportProgress.value = update.progress;
-          } else if (update.status == Status.FAILED) {
+          } else if (update.status == Status.failed) {
             if (context.mounted) {
               showDialog(
                 context: context,

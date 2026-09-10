@@ -89,7 +89,7 @@ class _FontsManagerPageState extends State<FontsManagerPage> {
               ),
             );
           },
-          onReorder: (int oldIndex, int newIndex) {
+          onReorderItem: (int oldIndex, int newIndex) {
             FontsRegistry.reorder(oldIndex, newIndex);
             setState(() {});
           },
