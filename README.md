@@ -35,6 +35,35 @@ warnings about Gradle/AGP/Kotlin versions, Java 8 obsolescence, or SDK XML v4.
 `python3 tool/check_android_versions.py` re-checks the three files against the
 thresholds the Flutter tool enforces (plus the signing-config guard below).
 
+### Atualizações pelo GitHub (APK de depuração)
+
+O app consulta a versão estável mais recente em
+[`lueefr/stickers/releases`](https://github.com/lueefr/stickers/releases) ao
+iniciar (no máximo uma vez a cada 12 horas). Também é possível verificar
+manualmente em **Configurações → Verificar atualizações**. Quando existe uma
+versão mais nova, o botão de atualização abre diretamente o APK anexado à
+GitHub Release no navegador; o Android pede a confirmação da instalação.
+
+O workflow `.github/workflows/debug-apk-release.yml`:
+
+- testa e compila o APK de depuração em pull requests;
+- após um push para `main` (ou execução manual), cria a Release
+  `v<versão>+<build>` se ela ainda não existir;
+- anexa o APK universal e seu SHA-256 à Release.
+
+Para publicar a atualização seguinte, incremente `version:` em `pubspec.yaml`
+antes de enviar as mudanças para `main`. O endpoint `releases/latest` ignora
+rascunhos e pré-lançamentos, portanto somente Releases estáveis são oferecidas
+pelo app.
+
+Os APKs de depuração do workflow usam a chave estável
+`android/app/debug-signing.p12`. Ela é intencionalmente pública e serve **apenas
+para testes**, nunca para uma distribuição de produção. Um APK debug instalado
+anteriormente e assinado pela chave de outra máquina não pode ser atualizado
+por este workflow. Nesse primeiro uso, exporte os pacotes, desinstale o APK
+antigo e instale o APK da Release; as atualizações seguintes serão instaladas
+normalmente por cima dele.
+
 ### Release signing (optional)
 
 `android/key.properties` is gitignored, so a fresh checkout builds an *unsigned*

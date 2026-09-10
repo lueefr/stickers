@@ -130,5 +130,29 @@
   "clearCache": "Clear cache",
   "thisWillRestart": "This will restart the app",
   "couldntExportPacks": "Could not export sticker packs",
-  "tryExportAgain": "Please try exporting the packs again."
+  "tryExportAgain": "Please try exporting the packs again.",
+  "checkForUpdates": "Check for updates",
+  "checkForUpdatesDescription": "Get the newest APK from GitHub",
+  "checkingForUpdates": "Checking for updates...",
+  "updateAvailable": "Update available",
+  "updateAvailableMessage": "Version {latestVersion} is available. Installed version: {currentVersion}.",
+  "@updateAvailableMessage": {
+    "placeholders": {
+      "latestVersion": {"type": "String"},
+      "currentVersion": {"type": "String"}
+    }
+  },
+  "releaseNotes": "What's new",
+  "later": "Later",
+  "downloadUpdate": "Download update",
+  "appIsUpToDate": "App is up to date",
+  "appIsUpToDateMessage": "You already have the newest version ({currentVersion}).",
+  "@appIsUpToDateMessage": {
+    "placeholders": {
+      "currentVersion": {"type": "String"}
+    }
+  },
+  "updateCheckFailed": "Couldn't check for updates",
+  "updateCheckFailedMessage": "Check your internet connection and try again.",
+  "couldntOpenUpdate": "Couldn't open the APK download. Open the GitHub repository and download the latest release manually."
 }

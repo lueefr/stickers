@@ -1,191 +1,648 @@
 {
   "ar": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "bg": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "bn": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "cs": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "da": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "de": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "el": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "es": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "fa": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "fi": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "fr": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "he": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "hi": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "hr": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "hu": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "id": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "it": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "ja": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "ko": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "mr": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "ms": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "nb": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "nl": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "pl": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "ro": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "ru": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "sk": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "sr": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "sv": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "ta": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "te": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "th": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "tl": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "tr": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "uk": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "ur": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "vi": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ],
-
   "zh": [
     "couldntExportPacks",
-    "tryExportAgain"
+    "tryExportAgain",
+    "checkForUpdates",
+    "checkForUpdatesDescription",
+    "checkingForUpdates",
+    "updateAvailable",
+    "updateAvailableMessage",
+    "releaseNotes",
+    "later",
+    "downloadUpdate",
+    "appIsUpToDate",
+    "appIsUpToDateMessage",
+    "updateCheckFailed",
+    "updateCheckFailedMessage",
+    "couldntOpenUpdate"
   ]
 }

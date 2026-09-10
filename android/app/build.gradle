@@ -61,6 +61,16 @@ android {
     }
 
     signingConfigs {
+        // A stable, intentionally public debug key lets every GitHub Actions
+        // debug APK update the previous one. Never use this key for production.
+        debug {
+            storeFile = file("debug-signing.p12")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+            storeType = "PKCS12"
+        }
+
         // Only set up release signing when android/key.properties exists — it is
         // gitignored, so a fresh clone has none and `flutter build apk --release`
         // would otherwise fail while configuring the project.
@@ -78,6 +88,9 @@ android {
         }
     }
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
             if (keystorePropertiesFile.exists()) {
                 signingConfig signingConfigs.release
