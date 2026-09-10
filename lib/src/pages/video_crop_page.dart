@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
-import 'package:extended_image/extended_image.dart';
+import 'package:extended_image/extended_image.dart' hide MediaType;
 import 'package:flutter/material.dart';
 import 'package:stickers/generated/intl/app_localizations.dart';
 import 'package:stickers/src/constants.dart';
