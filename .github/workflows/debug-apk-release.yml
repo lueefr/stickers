@@ -1,0 +1,167 @@
+name: Build and publish debug APK
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Publishing a GitHub Release requires write access to repository contents.
+permissions:
+  contents: write
+
+concurrency:
+  group: debug-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Test, build and publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Read app version
+        id: version
+        shell: bash
+        run: |
+          python3 <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          pubspec = Path('pubspec.yaml').read_text(encoding='utf-8')
+          match = re.search(r'^version:\s*([0-9]+(?:\.[0-9]+)*\+[0-9]+)\s*$', pubspec, re.MULTILINE)
+          if not match:
+              raise SystemExit('pubspec.yaml must contain a numeric version such as 1.5.1+19')
+
+          full_version = match.group(1)
+          version_name, build_number = full_version.split('+', 1)
+          outputs = {
+              'full': full_version,
+              'name': version_name,
+              'build': build_number,
+              'tag': f'v{full_version}',
+              'safe': full_version.replace('+', '-'),
+          }
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              for key, value in outputs.items():
+                  output.write(f'{key}={value}\n')
+          PY
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate localizations
+        run: flutter gen-l10n
+
+      - name: Analyze
+        # The inherited codebase still has warning/info lint debt. Analyzer
+        # errors remain fatal, and the APK build below also compiles all code.
+        run: flutter analyze --no-fatal-warnings --no-fatal-infos
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Build signed debug APK
+        shell: bash
+        env:
+          GOOGLE_FONTS_API_KEY: ${{ secrets.GOOGLE_FONTS_API_KEY }}
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+          BUILD_NUMBER: ${{ steps.version.outputs.build }}
+        run: |
+          args=(
+            --debug
+            --build-name "$VERSION_NAME"
+            --build-number "$BUILD_NUMBER"
+          )
+          if [[ -n "$GOOGLE_FONTS_API_KEY" ]]; then
+            args+=(--dart-define="GOOGLE_FONTS_API_KEY=$GOOGLE_FONTS_API_KEY")
+          fi
+          flutter build apk "${args[@]}"
+
+      - name: Prepare APK
+        id: apk
+        shell: bash
+        env:
+          SAFE_VERSION: ${{ steps.version.outputs.safe }}
+        run: |
+          apk="build/app/outputs/flutter-apk/stickers-${SAFE_VERSION}-debug.apk"
+          mv build/app/outputs/flutter-apk/app-debug.apk "$apk"
+          hash=$(sha256sum "$apk" | cut -d ' ' -f 1)
+          printf '%s  %s\n' "$hash" "$(basename "$apk")" > "${apk}.sha256"
+          echo "path=$apk" >> "$GITHUB_OUTPUT"
+          echo "checksum=${apk}.sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: stickers-${{ steps.version.outputs.safe }}-debug
+          path: |
+            ${{ steps.apk.outputs.path }}
+            ${{ steps.apk.outputs.checksum }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        if: github.event_name != 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          FULL_VERSION: ${{ steps.version.outputs.full }}
+          APK: ${{ steps.apk.outputs.path }}
+          CHECKSUM: ${{ steps.apk.outputs.checksum }}
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; nothing was published." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          cat > release-notes.md <<EOF
+          ## APK de depuração
+
+          Este APK é assinado com a chave de depuração estável do projeto e pode
+          atualizar versões de depuração anteriores geradas por este workflow.
+
+          **Versão:** $FULL_VERSION
+
+          **Commit:** $GITHUB_SHA
+
+          Na primeira migração de um APK de depuração assinado em outra máquina,
+          o Android pode exigir a desinstalação da versão antiga. Exporte seus
+          pacotes antes de desinstalar o app.
+          EOF
+
+          gh release create "$TAG" "$APK" "$CHECKSUM" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Stickers $FULL_VERSION (debug)" \
+            --latest \
+            --generate-notes \
+            --notes-file release-notes.md
+
+          {
+            echo "### GitHub Release publicada"
+            echo "- Versão: \`$FULL_VERSION\`"
+            echo "- Tag: \`$TAG\`"
+            echo "- APK: \`$(basename "$APK")\`"
+          } >> "$GITHUB_STEP_SUMMARY"

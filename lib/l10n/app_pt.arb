@@ -127,5 +127,29 @@
   "clearCache": "Limpar cache",
   "thisWillRestart": "Isso reiniciará o app",
   "couldntExportPacks": "Não foi possível exportar os pacotes de figurinhas",
-  "tryExportAgain": "Tente exportar os pacotes novamente."
+  "tryExportAgain": "Tente exportar os pacotes novamente.",
+  "checkForUpdates": "Verificar atualizações",
+  "checkForUpdatesDescription": "Baixar o APK mais recente do GitHub",
+  "checkingForUpdates": "Verificando atualizações...",
+  "updateAvailable": "Atualização disponível",
+  "updateAvailableMessage": "A versão {latestVersion} está disponível. Versão instalada: {currentVersion}.",
+  "@updateAvailableMessage": {
+    "placeholders": {
+      "latestVersion": {"type": "String"},
+      "currentVersion": {"type": "String"}
+    }
+  },
+  "releaseNotes": "Novidades",
+  "later": "Depois",
+  "downloadUpdate": "Baixar atualização",
+  "appIsUpToDate": "O app está atualizado",
+  "appIsUpToDateMessage": "Você já tem a versão mais recente ({currentVersion}).",
+  "@appIsUpToDateMessage": {
+    "placeholders": {
+      "currentVersion": {"type": "String"}
+    }
+  },
+  "updateCheckFailed": "Não foi possível verificar atualizações",
+  "updateCheckFailedMessage": "Confira sua conexão com a internet e tente novamente.",
+  "couldntOpenUpdate": "Não foi possível abrir o download do APK. Abra o repositório no GitHub e baixe a versão mais recente manualmente."
 }

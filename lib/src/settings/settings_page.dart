@@ -9,6 +9,8 @@ import 'package:stickers/src/constants.dart';
 import 'package:stickers/src/dialogs/edit_quickmode_defaults_dialog.dart';
 import 'package:stickers/src/globals.dart';
 import 'package:stickers/src/languages.dart';
+import 'package:stickers/src/update/update_service.dart';
+import 'package:stickers/src/update/update_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'settings_controller.dart';
@@ -30,7 +32,7 @@ class SettingsPage extends StatelessWidget {
       appBar: AppBar(
         title: Text(AppLocalizations.of(context)!.settings),
       ),
-      body: Column(
+      body: ListView(
         children: [
           ListTile(
             leading: const Icon(Icons.invert_colors),
@@ -203,6 +205,16 @@ class SettingsPage extends StatelessWidget {
             child: Divider(),
           ),
           ListTile(
+            onTap: () => checkForAppUpdate(context, userInitiated: true),
+            leading: const Icon(Icons.system_update),
+            title: Text(AppLocalizations.of(context)!.checkForUpdates),
+            subtitle: Opacity(
+              opacity: .7,
+              child: Text(AppLocalizations.of(context)!.checkForUpdatesDescription),
+            ),
+            trailing: const Icon(Icons.chevron_right),
+          ),
+          ListTile(
             leading: const Icon(Icons.info_outline),
             title: Text(AppLocalizations.of(context)!.about),
             subtitle: info == null
@@ -224,8 +236,7 @@ class SettingsPage extends StatelessWidget {
           ),
           ListTile(
             onTap: () {
-              String url = "https://github.com/lolocomotive/stickers";
-              launchUrl(Uri.parse(url));
+              launchUrl(Uri.parse(githubRepositoryUrl));
             },
             leading: Icon(Icons.code),
             title: Text("GitHub"),

@@ -1,8 +1,6 @@
-gradle-wrapper.jar
+# The Gradle wrapper scripts and JAR are tracked so clean CI checkouts build.
 /.gradle
 /captures/
-/gradlew
-/gradlew.bat
 /local.properties
 GeneratedPluginRegistrant.java
 

@@ -17,9 +17,9 @@ import 'src/settings/settings_service.dart';
 void main() async {
   Stopwatch sw = Stopwatch()..start();
   WidgetsFlutterBinding.ensureInitialized();
-  PackageInfo.fromPlatform().then((result) => info = result);
 
   List<Future> tasks = [];
+  tasks.add(PackageInfo.fromPlatform().then((result) => info = result));
 
   LicenseRegistry.addLicense(() async* {
     final license = await rootBundle.loadString('assets/fonts/OFL.txt');
