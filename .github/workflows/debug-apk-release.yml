@@ -6,6 +6,16 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Which part to bump (auto = patch, rolling 9 over to the next minor)'
+        type: choice
+        options: [auto, patch, minor, major]
+        default: auto
+      version:
+        description: 'Explicit version name, e.g. 2.0.0 (overrides bump; must be newer)'
+        type: string
+        default: ''
 
 # Publishing a GitHub Release requires write access to repository contents.
 permissions:
@@ -19,6 +29,10 @@ jobs:
   build:
     name: Test, build and publish
     runs-on: ubuntu-latest
+    # Defense in depth: the version-bump commit pushed below (tagged [skip ci])
+    # must never trigger another release run. Pushes made with GITHUB_TOKEN
+    # already don't trigger workflows; this guard covers custom tokens too.
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
 
     steps:
       - name: Check out source
@@ -26,33 +40,66 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Read app version
+      - name: Compute next version
         id: version
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          BUMP: ${{ inputs.bump }}
+          EXPLICIT: ${{ inputs.version }}
         run: |
-          python3 <<'PY'
-          import os
-          import re
-          from pathlib import Path
+          pubspec=$(python3 tool/bump_version.py --pubspec)
+          echo "pubspec.yaml: $pubspec"
 
-          pubspec = Path('pubspec.yaml').read_text(encoding='utf-8')
-          match = re.search(r'^version:\s*([0-9]+(?:\.[0-9]+)*\+[0-9]+)\s*$', pubspec, re.MULTILINE)
-          if not match:
-              raise SystemExit('pubspec.yaml must contain a numeric version such as 1.5.1+19')
+          if [[ "$EVENT" == "pull_request" ]]; then
+            # PR builds only validate the code; the version is assigned when
+            # the change lands on main.
+            next="$pubspec"
+            bumped=false
+          else
+            latest=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name 2>/dev/null || true)
+            if [[ -n "$latest" ]] && python3 tool/bump_version.py --check "$latest"; then
+              echo "latest release: $latest"
+              base=$(python3 tool/bump_version.py --max "$pubspec" "$latest")
+            else
+              echo "no parseable previous release; basing the bump on pubspec.yaml"
+              base="$pubspec"
+            fi
+            echo "base version: $base"
 
-          full_version = match.group(1)
-          version_name, build_number = full_version.split('+', 1)
-          outputs = {
-              'full': full_version,
-              'name': version_name,
-              'build': build_number,
-              'tag': f'v{full_version}',
-              'safe': full_version.replace('+', '-'),
-          }
-          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
-              for key, value in outputs.items():
-                  output.write(f'{key}={value}\n')
-          PY
+            args=(--plan --base "$base")
+            [[ -n "$BUMP" ]] && args+=(--bump "$BUMP")
+            [[ -n "$EXPLICIT" ]] && args+=(--explicit "$EXPLICIT")
+            next=$(python3 tool/bump_version.py "${args[@]}")
+
+            # A re-run must not reuse a tag: keep advancing while it exists.
+            attempts=0
+            while gh release view "v$next" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; do
+              attempts=$((attempts + 1))
+              if [[ "$attempts" -ge 50 ]]; then
+                echo "::error::could not find a free release tag after 50 attempts"
+                exit 1
+              fi
+              echo "tag v$next already exists; advancing once more"
+              next=$(python3 tool/bump_version.py --next "$next")
+            done
+
+            python3 tool/bump_version.py --set-pubspec "$next"
+            bumped=true
+          fi
+
+          name="${next%%+*}"
+          build="${next##*+}"
+          {
+            echo "full=$next"
+            echo "name=$name"
+            echo "build=$build"
+            echo "tag=v$next"
+            echo "safe=${next//+/-}"
+            echo "bumped=$bumped"
+          } >> "$GITHUB_OUTPUT"
+          echo "building version: $next (bumped: $bumped)"
 
       - name: Set up Java
         uses: actions/setup-java@v5
@@ -123,6 +170,37 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Commit version bump
+        id: bump_commit
+        if: github.event_name != 'pull_request' && steps.version.outputs.bumped == 'true'
+        shell: bash
+        env:
+          FULL_VERSION: ${{ steps.version.outputs.full }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add pubspec.yaml
+          if git diff --cached --quiet; then
+            echo "pubspec.yaml already up to date; nothing to commit"
+            echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git commit -m "chore: bump version to $FULL_VERSION [skip ci]"
+          branch="${GITHUB_REF_NAME:?}"
+          git fetch origin "$branch"
+          if ! git rebase "origin/$branch"; then
+            git rebase --abort
+            echo "::warning::could not rebase the version bump onto the latest $branch; the release below still goes ahead and the next run self-heals from it"
+            echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! git push origin "HEAD:$branch"; then
+            echo "::warning::could not push the version bump; the release below still goes ahead and the next run self-heals from it"
+            echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
       - name: Publish GitHub Release
         if: github.event_name != 'pull_request'
         shell: bash
@@ -132,11 +210,18 @@ jobs:
           FULL_VERSION: ${{ steps.version.outputs.full }}
           APK: ${{ steps.apk.outputs.path }}
           CHECKSUM: ${{ steps.apk.outputs.checksum }}
+          TARGET: ${{ steps.bump_commit.outputs.sha }}
         run: |
+          # Defensive: the version step already picked a free tag, but a
+          # concurrent run could have claimed it in the meantime.
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Release $TAG already exists; nothing was published." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
+
+          # Point the tag at the version-bump commit so the tagged tree builds
+          # the exact version the release advertises.
+          target="${TARGET:-$GITHUB_SHA}"
 
           cat > release-notes.md <<EOF
           ## APK de depuração
@@ -146,7 +231,7 @@ jobs:
 
           **Versão:** $FULL_VERSION
 
-          **Commit:** $GITHUB_SHA
+          **Commit:** $target
 
           Na primeira migração de um APK de depuração assinado em outra máquina,
           o Android pode exigir a desinstalação da versão antiga. Exporte seus
@@ -155,7 +240,7 @@ jobs:
 
           gh release create "$TAG" "$APK" "$CHECKSUM" \
             --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
+            --target "$target" \
             --title "Stickers $FULL_VERSION (debug)" \
             --latest \
             --generate-notes \
@@ -165,5 +250,6 @@ jobs:
             echo "### GitHub Release publicada"
             echo "- Versão: \`$FULL_VERSION\`"
             echo "- Tag: \`$TAG\`"
+            echo "- Commit: \`$target\`"
             echo "- APK: \`$(basename "$APK")\`"
           } >> "$GITHUB_STEP_SUMMARY"
