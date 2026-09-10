@@ -45,9 +45,17 @@ class _TextEditingDialogState extends State<TextEditingDialog> {
 
   @override
   void initState() {
-    page = FontsRegistry.indexOf(widget.parent.text.fontName);
-    _pageController = PageController(viewportFraction: .25, initialPage: page);
     super.initState();
+    final fontCount = FontsRegistry.fontCount;
+    // indexOf returns -1 when the layer font isn't in the registry.
+    page = fontCount == 0 ? 0 : FontsRegistry.indexOf(widget.parent.text.fontName).clamp(0, fontCount - 1);
+    _pageController = PageController(viewportFraction: .25, initialPage: page);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   int _currentTool = 0;
@@ -122,9 +130,13 @@ class _TextEditingDialogState extends State<TextEditingDialog> {
                 ),
                 child: editableTextStack,
               );
-        final textField = Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Center(child: decoratedTextField),
+        // Own layer, so typing only repaints this area instead of re-running
+        // the full-screen backdrop blur on every keystroke.
+        final textField = RepaintBoundary(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Center(child: decoratedTextField),
+          ),
         );
         final topActionBar = GestureDetector(
           onTap: () => widget.disableEditing(),
@@ -170,9 +182,10 @@ class _TextEditingDialogState extends State<TextEditingDialog> {
             itemCount: FontsRegistry.fontCount + 1,
             onPageChanged: (page) {
               HapticFeedback.lightImpact();
-              setState(() {});
+              if (FontsRegistry.fontCount == 0) return;
               this.page = min(page, FontsRegistry.fontCount - 1);
               widget.parent.text.fontName = FontsRegistry.at(this.page).family;
+              setState(() {});
             },
             pageSnapping: false,
             controller: _pageController,
@@ -196,7 +209,7 @@ class _TextEditingDialogState extends State<TextEditingDialog> {
                           .then((_) {
                         _pageController.animateToPage(
                           FontsRegistry.fontCount - 1,
-                          duration: Duration(milliseconds: 300),
+                          duration: const Duration(milliseconds: 300),
                           curve: Curves.ease,
                         );
                       });
@@ -207,7 +220,7 @@ class _TextEditingDialogState extends State<TextEditingDialog> {
                 onTap: () {
                   _pageController.animateToPage(
                     i,
-                    duration: Duration(milliseconds: 150),
+                    duration: const Duration(milliseconds: 150),
                     curve: Curves.easeInOutQuad,
                   );
                 },
@@ -225,8 +238,8 @@ class _TextEditingDialogState extends State<TextEditingDialog> {
           children: [
             LabeledIconButton(
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                child: Text(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                child: const Text(
                   "A",
                   style: TextStyle(
                     fontSize: 22,
@@ -565,7 +578,7 @@ class _TextEditingDialogState extends State<TextEditingDialog> {
                 child: Column(
                   children: [
                     AnimatedSwitcher(
-                        duration: Duration(milliseconds: 150),
+                        duration: const Duration(milliseconds: 150),
                         child: KeyedSubtree(
                           key: ValueKey<int>(_currentTool),
                           child: _tools[_currentTool],
@@ -588,7 +601,7 @@ class _TextEditingDialogState extends State<TextEditingDialog> {
                       child: Column(
                         children: [
                           topActionBar,
-                          toolbar,
+                          RepaintBoundary(child: toolbar),
                         ],
                       ),
                     ))
@@ -605,8 +618,8 @@ class _TextEditingDialogState extends State<TextEditingDialog> {
                     reverse: true,
                     child: textField,
                   )),
-                  toolbar,
-                  SizedBox(
+                  RepaintBoundary(child: toolbar),
+                  const SizedBox(
                     height: 16,
                   )
                 ],
@@ -628,6 +641,7 @@ class _TextEditingDialogState extends State<TextEditingDialog> {
           context: context,
           builder: (context) => EyedropperDialog(
               widget.rbKey.currentContext!.findRenderObject() as RenderRepaintBoundary));
+      if (_pickedColor == null) return;
       color = _pickedColor!;
     }
     setState(() {
@@ -641,6 +655,7 @@ class _TextEditingDialogState extends State<TextEditingDialog> {
           context: context,
           builder: (context) => EyedropperDialog(
               widget.rbKey.currentContext!.findRenderObject() as RenderRepaintBoundary));
+      if (_pickedColor == null) return;
       color = _pickedColor!;
     }
     setState(() {
@@ -654,6 +669,7 @@ class _TextEditingDialogState extends State<TextEditingDialog> {
           context: context,
           builder: (context) => EyedropperDialog(
               widget.rbKey.currentContext!.findRenderObject() as RenderRepaintBoundary));
+      if (_pickedColor == null) return;
       color = _pickedColor!;
     }
     setState(() {

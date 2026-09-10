@@ -52,31 +52,32 @@ class _FontsManagerPageState extends State<FontsManagerPage> {
             HapticFeedback.lightImpact();
           },
           itemBuilder: (context, i) {
+            final entry = FontsRegistry.at(i);
             return ReorderableDelayedDragStartListener(
               index: i,
-              key: ValueKey(i),
+              key: ValueKey(entry.family),
               child: ListTile(
                 onTap: () async {
                   var result =
-                      await showDialog(context: context, builder: (context) => EditFontDialog(FontsRegistry.at(i)));
+                      await showDialog(context: context, builder: (context) => EditFontDialog(entry));
                   if (result == "") result = null;
-                  FontsRegistry.at(i).display = result;
+                  entry.display = result;
                   FontsRegistry.enqueueSave();
                 },
                 leading: IconButton(
                   onPressed: () async {
                     final shouldDelete = await showDialog(
-                        context: context, builder: (context) => DeleteConfirmDialog(FontsRegistry.at(i).family));
+                        context: context, builder: (context) => DeleteConfirmDialog(entry.family));
                     if (shouldDelete) {
-                      FontsRegistry.delete(FontsRegistry.at(i).family);
+                      FontsRegistry.delete(entry.family);
                       setState(() {});
                     }
                   },
-                  icon: Icon(Icons.delete),
+                  icon: const Icon(Icons.delete),
                 ),
                 title: Text(
-                  FontsRegistry.at(i).family,
-                  style: TextStyle(fontFamily: FontsRegistry.at(i).family),
+                  entry.family,
+                  style: TextStyle(fontFamily: entry.family),
                 ),
                 trailing: ReorderableDragStartListener(
                   index: i,
@@ -115,6 +116,12 @@ class _EditFontDialogState extends State<EditFontDialog> {
   void initState() {
     _controller = TextEditingController(text: widget.entry.display);
     super.initState();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   @override

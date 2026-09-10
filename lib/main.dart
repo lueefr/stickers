@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -7,6 +8,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:stickers/src/constants.dart';
 import 'package:stickers/src/data/load_store.dart';
+import 'package:stickers/src/dialogs/eyedropper_dialog.dart';
 import 'package:stickers/src/fonts_api/fonts_registry.dart';
 import 'package:stickers/src/globals.dart';
 
@@ -17,6 +19,14 @@ import 'src/settings/settings_service.dart';
 void main() async {
   Stopwatch sw = Stopwatch()..start();
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Sticker lists decode many small thumbnails; keep them cached while scrolling.
+  PaintingBinding.instance.imageCache.maximumSize = 500;
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 200 << 20;
+
+  // Compile the HSL slider shaders in the background so opening the color
+  // picker later doesn't jank on first paint.
+  unawaited(GradientSliderTrackShape.prime());
 
   List<Future> tasks = [];
   tasks.add(PackageInfo.fromPlatform().then((result) => info = result));

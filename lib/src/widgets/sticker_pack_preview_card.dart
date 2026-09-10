@@ -107,7 +107,7 @@ class _StickerPackPreviewCardState extends State<StickerPackPreviewCard> {
                     Container(
                       decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), boxShadow: [
                         BoxShadow(
-                          offset: Offset(1, 1),
+                          offset: const Offset(1, 1),
                           blurRadius: 3,
                           color: Theme.of(context).brightness == Brightness.light ? Colors.black26 : Colors.black12,
                         )
@@ -119,6 +119,9 @@ class _StickerPackPreviewCardState extends State<StickerPackPreviewCard> {
                           File(widget.pack.trayIcon ?? widget.pack.stickers.first.source),
                           width: 48,
                           height: 48,
+                          cacheWidth: 96,
+                          cacheHeight: 96,
+                          gaplessPlayback: true,
                           fit: BoxFit.contain,
                         ),
                       ),
@@ -162,7 +165,6 @@ class _StickerPackPreviewCardState extends State<StickerPackPreviewCard> {
           height: 100,
           padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
           child: ListView.builder(
-            shrinkWrap: true,
             scrollDirection: Axis.horizontal,
             itemBuilder: (context, index) {
               var sticker = widget.pack.stickers[index];
@@ -173,7 +175,7 @@ class _StickerPackPreviewCardState extends State<StickerPackPreviewCard> {
                   height: 84,
                   decoration: BoxDecoration(borderRadius: BorderRadius.circular(defaultBorderRadius), boxShadow: [
                     BoxShadow(
-                      offset: Offset(1, 1),
+                      offset: const Offset(1, 1),
                       blurRadius: 3,
                       color: Theme.of(context).brightness == Brightness.light ? Colors.black26 : Colors.black12,
                     )
@@ -185,6 +187,9 @@ class _StickerPackPreviewCardState extends State<StickerPackPreviewCard> {
                       File(sticker.source),
                       width: double.infinity,
                       height: double.infinity,
+                      cacheWidth: 168,
+                      cacheHeight: 168,
+                      gaplessPlayback: true,
                       fit: BoxFit.contain,
                     ),
                   ),

@@ -37,9 +37,9 @@ class _FontsSearchPageState extends State<FontsSearchPage> {
                           context: context,
                           delegate: GoogleFontsSearchDelegate(snapshot.data!.items));
                     },
-                    icon: Icon(Icons.search));
+                    icon: const Icon(Icons.search));
               }
-              return SizedBox();
+              return const SizedBox.shrink();
             })
       ],
       child: FutureBuilder(
@@ -49,7 +49,7 @@ class _FontsSearchPageState extends State<FontsSearchPage> {
               final result = snapshot.data!;
               return ListView.separated(
                 separatorBuilder: (ctx, idx) {
-                  return SizedBox(
+                  return const SizedBox(
                     height: 8,
                   );
                 },
@@ -60,15 +60,15 @@ class _FontsSearchPageState extends State<FontsSearchPage> {
               );
             }
             if (snapshot.hasError) {
-              print(snapshot.error);
-              print(snapshot.stackTrace);
+              debugPrint(snapshot.error.toString());
+              debugPrint(snapshot.stackTrace.toString());
               return Column(
                 children: [
                   Text(AppLocalizations.of(context)!.error),
                 ],
               );
             }
-            return Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator());
           }),
     );
   }
@@ -89,7 +89,7 @@ class _GoogleFontPreviewState extends State<GoogleFontPreview> {
 
   @override
   void initState() {
-    Future.delayed(Duration(milliseconds: 300), () {
+    Future.delayed(const Duration(milliseconds: 300), () {
       if (!mounted) return;
       setState(() {
         _delayOver = true;
@@ -151,7 +151,7 @@ class _GoogleFontPreviewState extends State<GoogleFontPreview> {
                             !asyncSnapshot.hasError)
                         ? .7
                         : 0,
-                    duration: Duration(milliseconds: 300),
+                    duration: const Duration(milliseconds: 300),
                     child: Padding(
                       padding: const EdgeInsets.all(10.0),
                       child: CircularProgressIndicator(

@@ -1,42 +1,20 @@
 import 'package:flutter/cupertino.dart';
-import 'package:image_editor/image_editor.dart';
+import 'package:flutter/foundation.dart';
 import 'package:stickers/src/pages/edit_page.dart';
 
 class DrawLayer extends StatelessWidget implements EditorLayer {
   final DrawingPainter painter = DrawingPainter();
-
-  DrawOption get drawOption {
-    DrawOption r = DrawOption();
-    for (final stroke in painter.strokes) {
-      if (stroke.points.isEmpty) continue;
-      final linePaint = DrawPaint(paintingStyle: PaintingStyle.stroke, color: stroke.color, lineWeight: stroke.width);
-      final fillPaint = DrawPaint(paintingStyle: PaintingStyle.fill, color: stroke.color, lineWeight: stroke.width);
-      Offset last = stroke.points.first;
-      for (final point in stroke.points) {
-        r.addDrawPart(LineDrawPart(start: last, end: point, paint: linePaint));
-        r.addDrawPart(
-          OvalDrawPart(
-              rect: Rect.fromLTWH(
-                point.dx - (stroke.width ) / 2 ,
-                point.dy - (stroke.width ) / 2 ,
-                stroke.width ,
-                stroke.width ,
-              ),
-              paint: fillPaint),
-        );
-        last = point;
-      }
-    }
-    return r;
-  }
 
   DrawLayer({super.key});
 
   @override
   Widget build(BuildContext context) {
     return IgnorePointer(
-      child: CustomPaint(
-        painter: painter,
+      // Own layer so a stroke repaint never touches sibling layers.
+      child: RepaintBoundary(
+        child: CustomPaint(
+          painter: painter,
+        ),
       ),
     );
   }
@@ -45,30 +23,83 @@ class DrawLayer extends StatelessWidget implements EditorLayer {
 class Stroke {
   final Color color;
   final double width;
-  List<Offset> points = [];
+  final List<Offset> points = [];
+
+  // Cached path, rebuilt only when the points (or the scale) change, so a
+  // long stroke paints in a single drawPath instead of hundreds of drawLine.
+  Path? _path;
+  int _pathPointCount = -1;
+  double _pathScale = -1;
 
   Stroke(this.color, this.width);
+
+  Path pathFor(double scaleFactor) {
+    if (_path == null || _pathPointCount != points.length || _pathScale != scaleFactor) {
+      final path = Path();
+      if (points.isNotEmpty) {
+        path.moveTo(points.first.dx * scaleFactor, points.first.dy * scaleFactor);
+        for (var i = 1; i < points.length; i++) {
+          path.lineTo(points[i].dx * scaleFactor, points[i].dy * scaleFactor);
+        }
+      }
+      _path = path;
+      _pathPointCount = points.length;
+      _pathScale = scaleFactor;
+    }
+    return _path!;
+  }
 }
 
 class DrawingPainter extends CustomPainter {
   List<Stroke> strokes = [];
   double scaleFactor = 1;
 
-  DrawingPainter();
+  final ChangeNotifier _repaintNotifier;
+
+  DrawingPainter._(this._repaintNotifier) : super(repaint: _repaintNotifier);
+
+  factory DrawingPainter() => DrawingPainter._(ChangeNotifier());
+
+  final Paint _strokePaint = Paint()
+    ..strokeCap = StrokeCap.round
+    ..strokeJoin = StrokeJoin.round
+    ..style = PaintingStyle.stroke;
+  final Paint _fillPaint = Paint()..style = PaintingStyle.fill;
+
+  /// Adds a point to the current stroke and repaints only this layer.
+  /// Unlike `setState`, this doesn't rebuild the editor page, so drawing
+  /// stays at 60fps no matter how complex the rest of the UI is.
+  void addPoint(Offset point) {
+    strokes.last.points.add(point);
+    _repaintNotifier.notifyListeners();
+  }
+
+  void addStroke(Stroke stroke) {
+    strokes.add(stroke);
+    _repaintNotifier.notifyListeners();
+  }
+
+  Stroke removeLastStroke() {
+    final stroke = strokes.removeLast();
+    _repaintNotifier.notifyListeners();
+    return stroke;
+  }
+
+  void repaint() => _repaintNotifier.notifyListeners();
 
   @override
   void paint(Canvas canvas, Size size) {
-    Paint paint = Paint();
-    paint.strokeCap = StrokeCap.round;
     for (final stroke in strokes) {
-      paint.color = stroke.color;
-      paint.strokeWidth = stroke.width * scaleFactor;
       if (stroke.points.isEmpty) continue;
-      Offset last = stroke.points.first;
-      for (final point in stroke.points) {
-        canvas.drawLine(last * scaleFactor, point * scaleFactor, paint);
-        last = point;
+      if (stroke.points.length == 1) {
+        // A tap without movement draws a single dot.
+        _fillPaint.color = stroke.color;
+        canvas.drawCircle(stroke.points.first * scaleFactor, stroke.width * scaleFactor / 2, _fillPaint);
+        continue;
       }
+      _strokePaint.color = stroke.color;
+      _strokePaint.strokeWidth = stroke.width * scaleFactor;
+      canvas.drawPath(stroke.pathFor(scaleFactor), _strokePaint);
     }
   }
 

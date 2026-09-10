@@ -115,10 +115,10 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
                     return EditorConfig(
                       editorMaskColorHandler: (ctx, pointerDown) {
                         if (_previousPtrVal && !pointerDown) {
-                          _maskColorController.animateTo(1, duration: Duration(milliseconds: 150));
+                          _maskColorController.animateTo(1, duration: const Duration(milliseconds: 150));
                         }
                         if (!_previousPtrVal && pointerDown) {
-                          _maskColorController.animateTo(0, duration: Duration(milliseconds: 150));
+                          _maskColorController.animateTo(0, duration: const Duration(milliseconds: 150));
                         }
                         _previousPtrVal = pointerDown;
                         return Color.lerp(
@@ -128,7 +128,7 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
                         )!;
                       },
                       animationCurve: Curves.ease,
-                      tickerDuration: Duration(),
+                      tickerDuration: const Duration(),
                       lineHeight: 3,
                       lineColor: Theme.of(context).colorScheme.primary.withAlpha(100),
                       animationDuration: const Duration(milliseconds: 400),
@@ -147,7 +147,7 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
             Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -157,7 +157,7 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
                         _editorController.undo();
                         setState(() {});
                       },
-                      icon: Icon(Icons.undo),
+                      icon: const Icon(Icons.undo),
                     ),
                     IconButton(
                       tooltip: "Rotate left",
@@ -165,7 +165,7 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
                         _editorController.rotate(degree: -90, animation: true);
                         setState(() {});
                       },
-                      icon: Icon(Icons.rotate_left),
+                      icon: const Icon(Icons.rotate_left),
                     ),
                     IconButton(
                       tooltip: "Rotate -1°",
@@ -173,7 +173,7 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
                         _editorController.rotate(degree: -1, animation: true, rotateCropRect: false);
                         setState(() {});
                       },
-                      icon: Icon(Icons.rotate_90_degrees_ccw),
+                      icon: const Icon(Icons.rotate_90_degrees_ccw),
                     ),
                     IconButton(
                       tooltip: "Rotate +1°",
@@ -181,7 +181,7 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
                         _editorController.rotate(degree: 1, animation: true, rotateCropRect: false);
                         setState(() {});
                       },
-                      icon: Icon(Icons.rotate_90_degrees_cw),
+                      icon: const Icon(Icons.rotate_90_degrees_cw),
                     ),
                     IconButton(
                       tooltip: "Rotate right",
@@ -189,7 +189,7 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
                         _editorController.rotate(degree: 90, animation: true);
                         setState(() {});
                       },
-                      icon: Icon(Icons.rotate_right),
+                      icon: const Icon(Icons.rotate_right),
                     ),
                     IconButton(
                       tooltip: "Flip",
@@ -197,7 +197,7 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
                         _editorController.flip(animation: true);
                         setState(() {});
                       },
-                      icon: Icon(Icons.flip),
+                      icon: const Icon(Icons.flip),
                     ),
                     IconButton(
                       tooltip: "Reset",
@@ -207,11 +207,11 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
                           _aspectRatio = null;
                         });
                       },
-                      icon: Icon(Icons.restart_alt),
+                      icon: const Icon(Icons.restart_alt),
                     ),
                   ],
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   child: SegmentedButton<double>(
@@ -222,8 +222,8 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
                       ButtonSegment(
                           value: 0,
                           icon: Column(children: [
-                            Icon(Icons.crop_free),
-                            Text(
+                            const Icon(Icons.crop_free),
+                            const Text(
                               "Free",
                               style: TextStyle(fontSize: 10),
                             )
@@ -231,8 +231,8 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
                       ButtonSegment(
                           value: 16 / 9,
                           icon: Column(children: [
-                            Icon(Icons.crop_16_9),
-                            Text(
+                            const Icon(Icons.crop_16_9),
+                            const Text(
                               "16:9",
                               style: TextStyle(fontSize: 10),
                             )
@@ -240,8 +240,8 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
                       ButtonSegment(
                           value: 3 / 2,
                           icon: Column(children: [
-                            Icon(Icons.crop_3_2),
-                            Text(
+                            const Icon(Icons.crop_3_2),
+                            const Text(
                               "3:2",
                               style: TextStyle(fontSize: 10),
                             )
@@ -249,8 +249,8 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
                       ButtonSegment(
                           value: 1,
                           icon: Column(children: [
-                            Icon(Icons.crop_din),
-                            Text(
+                            const Icon(Icons.crop_din),
+                            const Text(
                               "1:1",
                               style: TextStyle(fontSize: 10),
                             )
@@ -262,7 +262,7 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
                               angle: pi / 2,
                               child: Icon(Icons.crop_3_2),
                             ),
-                            Text(
+                            const Text(
                               "2:3",
                               style: TextStyle(fontSize: 10),
                             )
@@ -274,7 +274,7 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
                               angle: pi / 2,
                               child: Icon(Icons.crop_16_9),
                             ),
-                            Text(
+                            const Text(
                               "9:16",
                               style: TextStyle(fontSize: 10),
                             )

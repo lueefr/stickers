@@ -27,6 +27,12 @@ class _EditStickerDialogState extends State<EditStickerDialog> {
   }
 
   @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return AlertDialog(
       content: SingleChildScrollView(
@@ -50,6 +56,7 @@ class _EditStickerDialogState extends State<EditStickerDialog> {
                   File(widget.pack.stickers[widget.index].source),
                   width: double.infinity,
                   height: 256,
+                  gaplessPlayback: true,
                   fit: BoxFit.contain,
                 ),
               ),
@@ -125,16 +132,17 @@ class _EditStickerDialogState extends State<EditStickerDialog> {
     );
   }
 
+  static final RegExp _emojiRegex = RegExp(
+      r"(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])");
+
   String? validator(String? value) {
     if (value == null || value.isEmpty) {
       return AppLocalizations.of(context)!.pleaseProvideAtLeastOneEmoji;
     } else if (value.characters.length > 3) {
       return AppLocalizations.of(context)!.pleaseProvideAtmost3Emojis;
     }
-    final emojiRegex = RegExp(
-        r"(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])");
     for (final char in value.characters) {
-      if (emojiRegex.allMatches(char).isEmpty) {
+      if (_emojiRegex.allMatches(char).isEmpty) {
         return AppLocalizations.of(context)!.pleaseEnterOnlyEmojis;
       }
     }

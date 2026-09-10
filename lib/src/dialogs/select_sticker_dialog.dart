@@ -32,7 +32,7 @@ class SelectStickerDialog extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: [
                     BoxShadow(
-                      offset: Offset(1, 1),
+                      offset: const Offset(1, 1),
                       blurRadius: 3,
                       color: Theme.of(context).brightness == Brightness.light
                           ? Colors.black26
@@ -53,6 +53,9 @@ class SelectStickerDialog extends StatelessWidget {
                       File(stickers[index].source),
                       width: double.infinity,
                       height: double.infinity,
+                      cacheWidth: 256,
+                      cacheHeight: 256,
+                      gaplessPlayback: true,
                       fit: BoxFit.contain,
                     ),
                   ),

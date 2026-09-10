@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -210,23 +211,26 @@ Future<Uint8List> stretchStickerToSquare(
 /// Copies the file to the required place
 ///
 /// If [index] is 30 it changes the tray icon.
-void addToPack(StickerPack pack, int index, Uint8List data) {
-  Directory("$packsDir/${pack.id}").createSync(recursive: true);
-  File output;
+///
+/// Async on purpose: synchronous file I/O here would block the UI thread and
+/// drop frames right when the editor closes.
+Future<void> addToPack(StickerPack pack, int index, Uint8List data) async {
+  final dir = await Directory("$packsDir/${pack.id}").create(recursive: true);
+  late final File output;
   if (index == 30) {
-    output = File("$packsDir/${pack.id}/tray_${DateTime.now().millisecondsSinceEpoch}.webp");
-    output.writeAsBytesSync(data);
+    output = File("${dir.path}/tray_${DateTime.now().millisecondsSinceEpoch}.webp");
+    await output.writeAsBytes(data);
     pack.trayIcon = output.path;
   } else {
-    output = File("$packsDir/${pack.id}/sticker_${index}_${DateTime.now().millisecondsSinceEpoch}.webp");
-    output.writeAsBytesSync(data);
+    output = File("${dir.path}/sticker_${index}_${DateTime.now().millisecondsSinceEpoch}.webp");
+    await output.writeAsBytes(data);
     if (index >= 0 && index < pack.stickers.length) {
       final oldSource = pack.stickers[index].source;
       pack.stickers[index].source = output.path;
       try {
         final oldFile = File(oldSource);
-        if (oldFile.existsSync() && oldFile.path != output.path) {
-          oldFile.deleteSync();
+        if (await oldFile.exists() && oldFile.path != output.path) {
+          await oldFile.delete();
         }
       } on FileSystemException catch (_) {
         // The sticker may point at an imported or shared file that is no longer writable.
@@ -236,10 +240,20 @@ void addToPack(StickerPack pack, int index, Uint8List data) {
     }
   }
   pack.onEdit();
-  savePacks(packs);
+  await savePacks(packs);
   // Clear media cache after importing a sticker
-  print("Clearing media cache");
-  Directory(mediaCacheDir).list().listen((entry) => entry.delete());
+  debugPrint("Clearing media cache");
+  unawaited(_clearMediaCache());
+}
+
+Future<void> _clearMediaCache() async {
+  try {
+    await for (final entry in Directory(mediaCacheDir).list()) {
+      try {
+        await entry.delete();
+      } on FileSystemException catch (_) {}
+    }
+  } on FileSystemException catch (_) {}
 }
 
 Future<File> saveTemp(Uint8List data) async {

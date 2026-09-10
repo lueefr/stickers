@@ -41,6 +41,7 @@ class _EyedropperDialogState extends State<EyedropperDialog> {
 
   void _decodeImage(ui.Image image) async {
     final byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    if (!mounted) return;
     _imageData = byteData!.buffer.asUint8List();
     _sampleColor(image);
     setState(() {});
@@ -322,6 +323,13 @@ FragmentProgram? _hueGradientProgram;
 FragmentProgram? _saturationGradientProgram;
 FragmentProgram? _lightnessGradientProgram;
 
+// Cached shaders: creating a new FragmentShader on every paint (i.e. on every
+// slider tick) would jank the picker. Painting is synchronous on the UI
+// thread, so sharing one shader per track is safe.
+ui.FragmentShader? _hueShader;
+ui.FragmentShader? _saturationShader;
+ui.FragmentShader? _lightnessShader;
+
 class GradientSliderTrackShape extends SliderTrackShape with BaseSliderTrackShape {
   double? h;
   double? s;
@@ -339,11 +347,15 @@ class GradientSliderTrackShape extends SliderTrackShape with BaseSliderTrackShap
   /// Loads (and caches) the fragment programs. Await this and rebuild once to
   /// make the first painted frame already show the gradients.
   static Future<void> prime() async {
-    _hueGradientProgram ??= await FragmentProgram.fromAsset('assets/shaders/hue_gradient.frag');
-    _saturationGradientProgram ??=
-        await FragmentProgram.fromAsset('assets/shaders/saturation_gradient.frag');
-    _lightnessGradientProgram ??=
-        await FragmentProgram.fromAsset('assets/shaders/lightness_gradient.frag');
+    try {
+      _hueGradientProgram ??= await FragmentProgram.fromAsset('assets/shaders/hue_gradient.frag');
+      _saturationGradientProgram ??=
+          await FragmentProgram.fromAsset('assets/shaders/saturation_gradient.frag');
+      _lightnessGradientProgram ??=
+          await FragmentProgram.fromAsset('assets/shaders/lightness_gradient.frag');
+    } catch (_) {
+      // The track paints a neutral fallback color until the programs load.
+    }
   }
 
   @override
@@ -358,19 +370,21 @@ class GradientSliderTrackShape extends SliderTrackShape with BaseSliderTrackShap
       required ui.TextDirection textDirection}) {
     var barRect = Rect.fromCenter(
         center: parentBox.paintBounds.center, width: parentBox.paintBounds.width - 48, height: 10);
-    final ui.FragmentProgram? program;
+    final ui.FragmentShader? shader;
     if (h == null) {
-      program = _hueGradientProgram;
+      final program = _hueGradientProgram;
+      shader = program == null ? null : (_hueShader ??= program.fragmentShader());
     } else if (s == null) {
-      program = _saturationGradientProgram;
+      final program = _saturationGradientProgram;
+      shader = program == null ? null : (_saturationShader ??= program.fragmentShader());
     } else if (l == null) {
-      program = _lightnessGradientProgram;
+      final program = _lightnessGradientProgram;
+      shader = program == null ? null : (_lightnessShader ??= program.fragmentShader());
     } else {
       throw Exception("Exactly one of the HSL components should be null");
     }
 
-    if (program != null) {
-      final shader = program.fragmentShader();
+    if (shader != null) {
       final double ratio = devicePixelRatio;
       shader.setFloat(0, barRect.width * ratio);
       shader.setFloat(1, barRect.height * ratio);
