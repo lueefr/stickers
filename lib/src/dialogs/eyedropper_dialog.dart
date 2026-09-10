@@ -238,8 +238,9 @@ class _HSLPickerState extends State<HSLPicker> {
   late HSLColor _color;
 
   void _updateColor() {
-    setState(() {});
-    final _color = HSLColor.fromAHSL(1, _h, _s, _l);
+    setState(() {
+      _color = HSLColor.fromAHSL(1, _h, _s, _l);
+    });
     widget.onUpdate?.call(_color);
   }
 

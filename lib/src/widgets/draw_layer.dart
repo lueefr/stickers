@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart';
 import 'package:stickers/src/pages/edit_page.dart';
 
 class DrawLayer extends StatelessWidget implements EditorLayer {
@@ -18,6 +17,12 @@ class DrawLayer extends StatelessWidget implements EditorLayer {
       ),
     );
   }
+}
+
+/// [ChangeNotifier.notifyListeners] is protected, so the repaint notifier of
+/// [DrawingPainter] gets its own subclass with a public way to wake listeners.
+class _RepaintNotifier extends ChangeNotifier {
+  void notify() => notifyListeners();
 }
 
 class Stroke {
@@ -54,11 +59,11 @@ class DrawingPainter extends CustomPainter {
   List<Stroke> strokes = [];
   double scaleFactor = 1;
 
-  final ChangeNotifier _repaintNotifier;
+  final _RepaintNotifier _repaintNotifier;
 
   DrawingPainter._(this._repaintNotifier) : super(repaint: _repaintNotifier);
 
-  factory DrawingPainter() => DrawingPainter._(ChangeNotifier());
+  factory DrawingPainter() => DrawingPainter._(_RepaintNotifier());
 
   final Paint _strokePaint = Paint()
     ..strokeCap = StrokeCap.round
@@ -71,21 +76,21 @@ class DrawingPainter extends CustomPainter {
   /// stays at 60fps no matter how complex the rest of the UI is.
   void addPoint(Offset point) {
     strokes.last.points.add(point);
-    _repaintNotifier.notifyListeners();
+    _repaintNotifier.notify();
   }
 
   void addStroke(Stroke stroke) {
     strokes.add(stroke);
-    _repaintNotifier.notifyListeners();
+    _repaintNotifier.notify();
   }
 
   Stroke removeLastStroke() {
     final stroke = strokes.removeLast();
-    _repaintNotifier.notifyListeners();
+    _repaintNotifier.notify();
     return stroke;
   }
 
-  void repaint() => _repaintNotifier.notifyListeners();
+  void repaint() => _repaintNotifier.notify();
 
   @override
   void paint(Canvas canvas, Size size) {

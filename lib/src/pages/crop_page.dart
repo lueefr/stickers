@@ -68,7 +68,9 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
       final stretched = await stretchStickerToSquare(
           state.rawImageData, _editorController.rotateDegrees);
       final output = await saveTemp(stretched);
-      if (!context.mounted) return;
+      // `context` here is `State.context`, so it has to be guarded with the
+      // State's own `mounted` flag.
+      if (!mounted) return;
       Navigator.of(context).pushNamed(
         "/edit",
         arguments: EditArguments(

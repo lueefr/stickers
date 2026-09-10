@@ -210,10 +210,12 @@ class FontsRegistry {
     await loader.load();
   }
 
+  /// Moves the entry at [oldIndex] to [newIndex].
+  ///
+  /// [newIndex] is the destination index *after* the entry has been removed,
+  /// which is what `ReorderableListView.onReorderItem` reports, so no index
+  /// correction is needed here.
   static void reorder(int oldIndex, int newIndex) {
-    if (newIndex > oldIndex) {
-      newIndex -= 1;
-    }
     final item = _orderedEntries.removeAt(oldIndex);
     _orderedEntries.insert(newIndex, item);
     enqueueSave();

@@ -35,7 +35,6 @@ class VideoCropPage extends StatefulWidget {
 
 class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateMixin {
   late final AnimationController _maskColorController;
-  final ImageEditorController _editorController = ImageEditorController();
   late final VideoPlayerController _controller;
   double _btnOpacity = 1;
   bool _ready = false;
@@ -215,7 +214,6 @@ class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateM
                 Stack(
                   children: [
                     RangeSlider(
-                        year2023: false,
                         values: _range,
                         onChangeEnd: (_) async {
                           if (_seekTarget == _controller.value.duration * _range.end) {
@@ -263,7 +261,6 @@ class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateM
                             inactiveColor: Colors.transparent,
                             value: progress,
                             onChanged: (_) {},
-                            year2023: false,
                           ),
                         );
                       },
@@ -275,7 +272,7 @@ class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateM
                   child: FilledButton(
                     clipBehavior: Clip.antiAlias,
                     style: ButtonStyle(
-                      padding: WidgetStateProperty.all(const EdgeInsets.zero),
+                      padding: WidgetStateProperty.all(EdgeInsets.zero),
                     ),
                     onPressed: _exporting ? null : () => doCrop(),
                     child: Column(
@@ -349,9 +346,9 @@ class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateM
         cropToSquare: _cropToSquare,
       );
       await for (final s in service.progressStream) {
-        if (s.status == Status.SUCCESS) {
+        if (s.status == Status.success) {
           break;
-        } else if (s.status == Status.FAILED) {
+        } else if (s.status == Status.failed) {
           debugPrint("Transcoding failed!");
           if (mounted) {
             showDialog(

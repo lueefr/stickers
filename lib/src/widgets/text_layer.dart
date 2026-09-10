@@ -22,7 +22,11 @@ class EditorTextLayerData {
 
 class TextLayer extends StatefulWidget implements EditorLayer {
   final EditorTextLayerData data;
-  TextLayerState? state;
+
+  /// Owned by this widget instance, so the editor can push transform updates
+  /// into the mounted state without going through a [GlobalKey]. It is kept
+  /// final because widgets have to stay immutable.
+  final TextLayerState state = TextLayerState();
 
   EditorText get text => data.text;
 
@@ -38,13 +42,10 @@ class TextLayer extends StatefulWidget implements EditorLayer {
   });
 
   @override
-  State<TextLayer> createState() {
-    state = TextLayerState();
-    return state!;
-  }
+  State<TextLayer> createState() => state;
 
   void update(Matrix4 matrix) {
-    state?.update(matrix);
+    state.update(matrix);
   }
 }
 
@@ -158,6 +159,9 @@ class TextLayerState extends State<TextLayer> with TickerProviderStateMixin {
   }
 
   void update(Matrix4 matrix) {
+    // The editor can keep pushing transform updates to a layer that is not
+    // mounted (or is already disposed), and such a state cannot rebuild.
+    if (!mounted) return;
     widget.text.transform = matrix;
     setState(() {});
   }
