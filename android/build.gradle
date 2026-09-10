@@ -14,33 +14,53 @@ subprojects {
 
 subprojects {
     // Force Java 17 for all Android subprojects to eliminate
-    // \"source value 8 is obsolete\" warnings from older plugins.
-    afterEvaluate {
-        if (project.hasProperty('android')) {
-            project.android {
-                compileOptions {
-                    sourceCompatibility JavaVersion.VERSION_17
-                    targetCompatibility JavaVersion.VERSION_17
-                }
+    // "source value 8 is obsolete" warnings from older plugins.
+    //
+    // NOTE: Do NOT use `afterEvaluate` here. On Gradle 9, calling
+    // `afterEvaluate` from a `subprojects` block throws
+    // "Cannot run Project.afterEvaluate(Closure) when the project is
+    // already evaluated" for projects pulled in early via
+    // `evaluationDependsOn(':app')`. `pluginManager.withPlugin` fires when
+    // the plugin is applied (immediately if already applied), so it is safe
+    // regardless of evaluation order.
+    project.pluginManager.withPlugin('com.android.application') {
+        project.android {
+            compileOptions {
+                sourceCompatibility JavaVersion.VERSION_17
+                targetCompatibility JavaVersion.VERSION_17
             }
         }
-        // If the subproject uses Kotlin, bump its jvmTarget to 17 as well.
-        if (project.hasProperty('kotlinOptions')) {
-            project.kotlinOptions {
-                jvmTarget = '17'
+    }
+    project.pluginManager.withPlugin('com.android.library') {
+        project.android {
+            compileOptions {
+                sourceCompatibility JavaVersion.VERSION_17
+                targetCompatibility JavaVersion.VERSION_17
             }
         }
-        // For projects using the newer kotlin DSL (Kotlin 2.x), try to set
-        // the compilerOptions jvmTarget if the extension exists.
-        try {
-            if (project.extensions.findByName('kotlin') != null) {
-                project.kotlin {
-                    jvmToolchain(17)
+    }
+    // If a subproject uses Kotlin, bump its jvmTarget to 17 as well. Both
+    // the modern plugin id and the legacy alias are handled ('kotlin-android'
+    // is what older Flutter plugins still apply).
+    ['org.jetbrains.kotlin.android', 'kotlin-android'].each { kotlinPluginId ->
+        project.pluginManager.withPlugin(kotlinPluginId) {
+            if (project.hasProperty('kotlinOptions')) {
+                project.kotlinOptions {
+                    jvmTarget = '17'
                 }
             }
-        } catch (Exception ignored) {
-            // Some subprojects don't have the kotlin extension or use older
-            // Kotlin versions where jvmToolchain isn't available – ignore.
+            // For projects using the newer kotlin DSL (Kotlin 2.x), try to set
+            // the jvmToolchain if the extension exists.
+            try {
+                if (project.extensions.findByName('kotlin') != null) {
+                    project.kotlin {
+                        jvmToolchain(17)
+                    }
+                }
+            } catch (Exception ignored) {
+                // Some subprojects don't have the kotlin extension or use older
+                // Kotlin versions where jvmToolchain isn't available – ignore.
+            }
         }
     }
 }
