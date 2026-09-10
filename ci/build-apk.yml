@@ -1,3 +1,6 @@
+# To activate: copy this file to .github/workflows/build-apk.yml (GitHub blocks apps without
+# the workflows permission from pushing workflow files; your own account can do it).
+#
 # Builds the Android APK(s) and uploads them as workflow artifacts.
 #
 # On a fork, enable Actions once via Settings -> Actions -> General -> Allow all actions,
