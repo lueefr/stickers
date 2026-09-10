@@ -113,9 +113,12 @@ class _EditPageState extends State<EditPage> {
         child: SafeArea(
           child: LayoutBuilder(builder: (context, constraints) {
             final isHorizontal = constraints.maxWidth > constraints.maxHeight;
+            // Two rows hold all `colors.length` swatches; the widest row has
+            // `columns` buttons, each of which adds 4px of padding.
+            final int columns = (colors.length + 1) ~/ 2;
             final double buttonSize = isHorizontal
-                ? (min(constraints.maxHeight - 48, 500 - 12)) / (colors.length / 2)
-                : min(constraints.maxWidth - 48, 500) / (colors.length / 2);
+                ? (min(constraints.maxHeight - 48, 500 - 12) - 4 * columns) / columns
+                : (min(constraints.maxWidth - 48, 500) - 4 * columns) / columns;
 
             final colorButtons = AnimatedCrossFade(
                 sizeCurve: _curve,
@@ -127,7 +130,7 @@ class _EditPageState extends State<EditPage> {
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: colors.getRange(0, (colors.length / 2).floor()).map((c) {
+                      children: colors.getRange(0, columns).map((c) {
                         return ColorButton(
                           c,
                           size: buttonSize,
@@ -139,7 +142,7 @@ class _EditPageState extends State<EditPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: colors
-                          .getRange((colors.length / 2).floor() + 1, colors.length)
+                          .getRange(columns, colors.length)
                           .map((c) => ColorButton(
                                 c,
                                 size: buttonSize,
@@ -307,10 +310,12 @@ class _EditPageState extends State<EditPage> {
                             onGestureStart: onGestureStart,
                             onMatrixUpdate: (_, translationDeltaMatrix, scaleDeltaMatrix, rotationDeltaMatrix) =>
                                 onMatrixUpdate(translationDeltaMatrix, scaleDeltaMatrix, rotationDeltaMatrix),
-                            child: Stack(children: [
-                              if (widget.mediaType == MediaType.picture)
-                                Image.file(_source)
-                              else
+child: Stack(children: [
+if (widget.mediaType == MediaType.picture)
+Positioned.fill(
+child: Image.file(_source, fit: BoxFit.fill),
+)
+else
                                 Center(
                                   child: AspectRatio(
                                     aspectRatio: _controller.value.aspectRatio,

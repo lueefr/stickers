@@ -51,6 +51,9 @@ class SelectStickerDialog extends StatelessWidget {
                     borderRadius: BorderRadius.circular(10),
                     child: Image.file(
                       File(stickers[index].source),
+                      width: double.infinity,
+                      height: double.infinity,
+                      fit: BoxFit.contain,
                     ),
                   ),
                 ),

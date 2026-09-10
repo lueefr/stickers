@@ -68,7 +68,15 @@ class _StickerPackPreviewCardState extends State<StickerPackPreviewCard> {
         closedShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         closedBuilder: (context, action) => GestureDetector(
           onLongPress: widget.onLongPress,
-          child: _buildContent(context),
+          // Provide our own (transparent) Material so the ListTile and the
+          // IconButtons inside always have a Material ancestor, no matter in
+          // which part of the container-transform tree the card is rebuilt.
+          // Fixes "No Material widget found. ListTile widgets require a
+          // Material widget ancestor" crashes on the packs list.
+          child: Material(
+            type: MaterialType.transparency,
+            child: _buildContent(context),
+          ),
         ),
         openBuilder: (BuildContext context, void Function({Object? returnValue}) action) =>
             StickerPackPage(widget.pack, widget.deleteCallback),
@@ -109,6 +117,9 @@ class _StickerPackPreviewCardState extends State<StickerPackPreviewCard> {
                         painter: CheckerPainter(context),
                         child: Image.file(
                           File(widget.pack.trayIcon ?? widget.pack.stickers.first.source),
+                          width: 48,
+                          height: 48,
+                          fit: BoxFit.contain,
                         ),
                       ),
                     ),
@@ -172,6 +183,9 @@ class _StickerPackPreviewCardState extends State<StickerPackPreviewCard> {
                     painter: CheckerPainter(context),
                     child: Image.file(
                       File(sticker.source),
+                      width: double.infinity,
+                      height: double.infinity,
+                      fit: BoxFit.contain,
                     ),
                   ),
                 ),

@@ -58,8 +58,11 @@ class _EditPackDialogState extends State<EditPackDialog> {
                   child: Stack(
                     children: [
                       if (widget.pack.trayIcon != null || widget.pack.stickers.isNotEmpty)
-                        Image.file(
-                          File(widget.pack.trayIcon ?? widget.pack.stickers.first.source),
+                        Positioned.fill(
+                          child: Image.file(
+                            File(widget.pack.trayIcon ?? widget.pack.stickers.first.source),
+                            fit: BoxFit.contain,
+                          ),
                         ),
                       Center(
                         child: Container(

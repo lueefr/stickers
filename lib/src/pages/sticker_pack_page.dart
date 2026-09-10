@@ -125,7 +125,12 @@ class StickerPackPageState extends State<StickerPackPage> {
                             : CustomPaint(
                                 painter: CheckerPainter(context),
                                 child: GestureDetector(
-                                  child: Image.file(File(widget.pack.stickers[index].source)),
+                                  child: Image.file(
+                                    File(widget.pack.stickers[index].source),
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                    fit: BoxFit.contain,
+                                  ),
                                   onTap: () {
                                     showDialog<String>(
                                       context: context,

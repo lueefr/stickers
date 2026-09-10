@@ -46,7 +46,12 @@ class _EditStickerDialogState extends State<EditStickerDialog> {
               clipBehavior: Clip.antiAlias,
               child: CustomPaint(
                 painter: CheckerPainter(context),
-                child: Image.file(File(widget.pack.stickers[widget.index].source)),
+                child: Image.file(
+                  File(widget.pack.stickers[widget.index].source),
+                  width: double.infinity,
+                  height: 256,
+                  fit: BoxFit.contain,
+                ),
               ),
             ),
             Form(
@@ -69,8 +74,13 @@ class _EditStickerDialogState extends State<EditStickerDialog> {
                   ),
                   Padding(
                     padding: const EdgeInsets.only(top: 24),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    // Wrap instead of Row so the actions never overflow on
+                    // narrow screens ("RIGHT OVERFLOWED BY ... PIXELS").
+                    child: Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 8,
                       children: [
                         TextButton(
                           onPressed: () {
