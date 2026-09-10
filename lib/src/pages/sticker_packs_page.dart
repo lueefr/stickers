@@ -25,6 +25,8 @@ class StickerPacksPage extends StatefulWidget {
 class StickerPacksPageState extends State<StickerPacksPage> {
   final Set<StickerPack> _selectedPacks = <StickerPack>{};
 
+  bool _exporting = false;
+
   bool get _selectionMode => _selectedPacks.isNotEmpty;
 
   @override
@@ -70,7 +72,7 @@ class StickerPacksPageState extends State<StickerPacksPage> {
               ),
               IconButton(
                 tooltip: AppLocalizations.of(context)!.export,
-                onPressed: _exportSelected,
+                onPressed: _exporting ? null : _exportSelected,
                 icon: const Icon(Icons.share),
               ),
               IconButton(
@@ -111,7 +113,9 @@ class StickerPacksPageState extends State<StickerPacksPage> {
               if (result == null) return;
               for (final f in result.files) {
                 try {
+                  if (f.path == null) throw const FormatException('File unavailable');
                   await importPack(File(f.path!));
+                  if (!mounted) return;
                   setState(() {});
                 } on Exception catch (e, st) {
                   debugPrint(e.toString());
@@ -124,7 +128,7 @@ class StickerPacksPageState extends State<StickerPacksPage> {
                           message: AppLocalizations.of(context)!.checkPack));
                 }
               }
-              setState(() {});
+              if (mounted) setState(() {});
             },
             mini: true,
             child: const Icon(Icons.upload_file),
@@ -213,8 +217,22 @@ class StickerPacksPageState extends State<StickerPacksPage> {
 
   Future<void> _exportSelected() async {
     final selected = _selectedPacks.toList();
-    for (final pack in selected) {
-      await exportPack(pack);
+    setState(() => _exporting = true);
+    try {
+      await exportPacks(selected);
+    } catch (e, st) {
+      debugPrint(e.toString());
+      debugPrintStack(stackTrace: st);
+      if (!mounted) return;
+      await showDialog(
+        context: context,
+        builder: (context) => ErrorDialog(
+          title: AppLocalizations.of(context)!.couldntExportPacks,
+          message: AppLocalizations.of(context)!.tryExportAgain,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _exporting = false);
     }
   }
 

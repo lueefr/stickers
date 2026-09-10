@@ -76,3 +76,14 @@ set GOOGLE_FONTS_API_KEY=<your-key> && build_all.cmd   # Windows
 both ...` means the checkout predates commit `1c7f0bf`, where the API key moved to
 a `--dart-define`. Update the checkout (or re-download it) and rebuild; no file
 has to be created by hand.
+
+### Exportar e restaurar pacotes
+
+- Na lista de pacotes, pressione e segure um pacote (ou toque no botão de seleção).
+- Marque os pacotes desejados; use “Select all” para selecionar todos.
+- Toque em exportar/compartilhar e salve o arquivo **`sticker_pack.zip`** usando o menu do sistema.
+- Para restaurar, toque no botão de importar (ícone de arquivo com seta) e selecione o ZIP. Todos os pacotes contidos nele serão adicionados ao aplicativo, sem substituir os existentes.
+
+O backup preserva nomes, autores, emojis, ícones e figurinhas estáticas ou animadas. ZIPs antigos com um único `pack.json` também continuam sendo aceitos. O nome do arquivo pode ser alterado sem impedir a importação.
+
+O novo formato contém um `packs.json` (`version: 1`, lista `packs`) e uma pasta `pack_N` com a mídia de cada pacote. Os caminhos no manifesto são relativos à raiz do ZIP.

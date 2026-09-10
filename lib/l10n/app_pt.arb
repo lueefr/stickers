@@ -125,5 +125,7 @@
   "trimFailedMsg": "Tente outro vídeo e, se ainda não funcionar, abra uma issue no GitHub",
   "fontsManagerDetails": "Adicionar/remover fontes do app",
   "clearCache": "Limpar cache",
-  "thisWillRestart": "Isso reiniciará o app"
+  "thisWillRestart": "Isso reiniciará o app",
+  "couldntExportPacks": "Não foi possível exportar os pacotes de figurinhas",
+  "tryExportAgain": "Tente exportar os pacotes novamente."
 }
