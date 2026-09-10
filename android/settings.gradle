@@ -19,8 +19,12 @@ pluginManagement {
 
 plugins {
     id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-    id "com.android.application" version '8.13.0' apply false
-    id "org.jetbrains.kotlin.android" version "2.1.20" apply false
+    // Flutter 3.47 hard-fails below Gradle 8.14 / AGP 8.11.1 / Kotlin 2.2.20.
+    // These versions stay inside the ranges the Kotlin Gradle plugin 2.4.0
+    // fully supports (Gradle 7.6.3-9.5.0, AGP 8.5.2-9.1.0), so no AGP 9
+    // migration is needed.
+    id "com.android.application" version '8.13.2' apply false
+    id "org.jetbrains.kotlin.android" version "2.4.0" apply false
 }
 
 include ":app"
