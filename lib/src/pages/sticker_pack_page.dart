@@ -135,24 +135,23 @@ class StickerPackPageState extends State<StickerPackPage> {
                                     fit: BoxFit.contain,
                                   ),
                                   onTap: () {
-                                    showDialog<String>(
-                                      context: context,
-                                      builder: ((context) => EditStickerDialog(widget.pack, index)),
-                                    ).then(
+                                    EditStickerDialog.show(context, widget.pack, index).then(
                                       (action) {
                                         if (action == "edit") {
-                                          // The dialog can rebuild (or drop) this grid cell
+                                          // The sheet can rebuild (or drop) this grid cell
                                           // while it is open, so navigate from the page's own
                                           // context instead of the cell one.
+                                          // Go through the crop screen first; the final save
+                                          // (addToPack) replaces the sticker at `index`
+                                          // in-place, overwriting the edited sticker.
                                           if (!mounted) return;
                                           Navigator.of(this.context)
                                               .pushNamed(
-                                                "/edit",
+                                                "/crop",
                                                 arguments: EditArguments(
                                                   pack: widget.pack,
                                                   index: index,
                                                   mediaPath: widget.pack.stickers[index].source,
-                                                  popCount: 1,
                                                 ),
                                               )
                                               .then((_) => setState(() {}));
