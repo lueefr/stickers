@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stickers/generated/intl/app_localizations.dart';
+import 'package:stickers/src/constants.dart';
 import 'package:stickers/src/data/sticker.dart';
 import 'package:stickers/src/data/sticker_pack.dart';
 import 'package:stickers/src/dialogs/edit_sticker_dialog.dart';

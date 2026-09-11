@@ -42,6 +42,7 @@ class TextLayer extends StatefulWidget implements EditorLayer {
   });
 
   @override
+  // ignore: no_logic_in_create_state
   State<TextLayer> createState() => state;
 
   void update(Matrix4 matrix) {
