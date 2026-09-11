@@ -31,6 +31,7 @@ class ImageStickerLayer extends StatefulWidget implements EditorLayer {
   });
 
   @override
+  // ignore: no_logic_in_create_state
   State<ImageStickerLayer> createState() => state;
 
   void update(Matrix4 matrix) {
