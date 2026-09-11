@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:math';
+import 'dart:ui' as ui;
 
 import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'package:stickers/generated/intl/app_localizations.dart';
 import 'package:stickers/src/checker_painter.dart';
 import 'package:stickers/src/data/load_store.dart';
 import 'package:stickers/src/data/sticker_pack.dart';
+import 'package:stickers/src/dialogs/error_dialog.dart';
 import 'package:stickers/src/pages/default_page.dart';
 
 class CropPage extends StatefulWidget {
@@ -65,8 +67,34 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
     setState(() => _isStretching = true);
     try {
       final state = widget.editorKey.currentState!;
-      final stretched = await stretchStickerToSquare(
-          state.rawImageData, _editorController.rotateDegrees);
+      final double rotation = _editorController.rotateDegrees;
+      final ui.Image? image = state.image;
+
+      // The crop box is what the user selected, if they selected anything:
+      // [stretchRegion] keeps it and otherwise falls back to the visible content
+      // of the sticker, because a sticker is a square canvas whose content sits
+      // in the middle with transparent margins around it. Stretching that whole
+      // canvas would leave the sticker exactly as it is.
+      Rect? region;
+      if (image != null) {
+        region = await stretchRegion(
+          state.rawImageData,
+          Size(image.width.toDouble(), image.height.toDouble()),
+          cropRect: state.getCropRect(),
+          rotation: rotation,
+        );
+      }
+      if (region == null && _alreadyFillsSquare(image, rotation)) {
+        // Nothing to stretch: say so instead of leaving the user with a button
+        // that appears to do nothing.
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppLocalizations.of(context)!.stickerAlreadyFillsSquare)),
+        );
+        return;
+      }
+
+      final stretched = await stretchStickerToSquare(state.rawImageData, rotation, region);
       final output = await saveTemp(stretched);
       // `context` here is `State.context`, so it has to be guarded with the
       // State's own `mounted` flag.
@@ -79,12 +107,30 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
           mediaPath: output.path,
         ),
       );
+    } catch (e) {
+      // Do not leave the user with a button that looks like it did nothing.
+      debugPrint("Couldn't stretch the sticker to 1:1: $e");
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => ErrorDialog(
+            title: AppLocalizations.of(context)!.stretchToSquare,
+            message: AppLocalizations.of(context)!.errorMessage + e.toString(),
+          ),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _isStretching = false);
       }
     }
   }
+
+  /// Whether stretching cannot change the sticker: a square image stretched as
+  /// it is (no rotation, no selection, no transparent margin to trim) is already
+  /// a filled 1:1 canvas.
+  bool _alreadyFillsSquare(ui.Image? image, double rotation) =>
+      image != null && image.width == image.height && rotation.truncate() % 360 == 0;
 
   @override
   Widget build(BuildContext context) {
