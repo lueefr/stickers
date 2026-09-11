@@ -5,12 +5,28 @@ import 'package:stickers/generated/intl/app_localizations.dart';
 import 'package:stickers/src/checker_painter.dart';
 import 'package:stickers/src/data/sticker_pack.dart';
 
+/// What the user asked the sticker sheet to do with an existing sticker.
+///
+/// The sheet only reports the choice: it is dismissed before the action runs,
+/// so the caller (the pack page) owns the navigation and uses its own
+/// [BuildContext].
+enum StickerSheetAction {
+  /// Crop / stretch / rotate the sticker that is already in the pack, then
+  /// write the result back over it.
+  edit,
+
+  /// Pick new media and put it in the same slot, replacing the old file while
+  /// keeping the position and the associated emojis.
+  replace,
+}
+
 /// The widget shown when a sticker is tapped inside a pack page.
 ///
-/// It previews the sticker over a transparency checkerboard, lets the user
-/// change the associated emojis, delete the sticker, or jump to the crop
-/// screen (the "edit" action, resolved by the caller through the returned
-/// `"edit"` result).
+/// It previews the sticker over a transparency checkerboard and offers every
+/// action that can be performed on a sticker that is already in the pack:
+/// crop/stretch it, replace it with new media, change its emojis, or delete
+/// it. The media actions are resolved by the caller through the returned
+/// [StickerSheetAction].
 ///
 /// It is presented as a modal bottom sheet through [show]: the previous
 /// implementation used `showDialog` + [AlertDialog], which on some devices
@@ -24,10 +40,11 @@ class EditStickerDialog extends StatefulWidget {
 
   const EditStickerDialog(this.pack, this.index, {super.key});
 
-  /// Shows the sticker editor and resolves with `"edit"` when the user asks
-  /// to edit the sticker, or `null` otherwise (dismissed / saved / deleted).
-  static Future<String?> show(BuildContext context, StickerPack pack, int index) {
-    return showModalBottomSheet<String>(
+  /// Shows the sticker editor and resolves with the picked action, or `null`
+  /// when the sheet was dismissed / the emojis were saved / the sticker was
+  /// deleted (the caller only has to refresh its grid in those cases).
+  static Future<StickerSheetAction?> show(BuildContext context, StickerPack pack, int index) {
+    return showModalBottomSheet<StickerSheetAction>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -43,6 +60,13 @@ class _EditStickerDialogState extends State<EditStickerDialog> {
   final formKey = GlobalKey<FormState>();
   final controller = TextEditingController();
   bool valid = true;
+
+  /// Animated stickers are animated WebP files, and the crop screen runs them
+  /// through the single-frame image editor: cropping one would silently
+  /// flatten the animation into a still image. The video pipeline (the
+  /// trimmer and the GIF converter) reads videos and GIFs only, so an
+  /// animated sticker can be replaced but not re-cropped.
+  bool get _canCrop => !widget.pack.animated;
 
   @override
   void initState() {
@@ -87,6 +111,38 @@ class _EditStickerDialogState extends State<EditStickerDialog> {
               ),
             ),
             const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    // Disabled (not hidden) for animated stickers, together with
+                    // the hint below, so the reason is obvious.
+                    onPressed: _canCrop
+                        ? () => Navigator.of(context).pop(StickerSheetAction.edit)
+                        : null,
+                    icon: const Icon(Icons.crop_free),
+                    label: Text(l10n.edit),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).pop(StickerSheetAction.replace),
+                    icon: const Icon(Icons.swap_horiz),
+                    label: Text(l10n.replaceSticker),
+                  ),
+                ),
+              ],
+            ),
+            if (!_canCrop) ...[
+              const SizedBox(height: 8),
+              Text(
+                l10n.animatedStickerCropUnavailable,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+            const SizedBox(height: 16),
             Form(
               key: formKey,
               autovalidateMode: AutovalidateMode.onUserInteraction,
@@ -123,13 +179,6 @@ class _EditStickerDialogState extends State<EditStickerDialog> {
                       l10n.deleteSticker,
                       style: TextStyle(color: Theme.of(context).colorScheme.error),
                     ),
-                  ),
-                  TextButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).pop("edit");
-                    },
-                    icon: const Icon(Icons.edit),
-                    label: Text(l10n.edit),
                   ),
                   FilledButton(
                     onPressed: valid

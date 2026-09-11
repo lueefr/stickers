@@ -1,5 +1,7 @@
 {
   "ar": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -17,6 +19,8 @@
     "couldntOpenUpdate"
   ],
   "bg": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -34,6 +38,8 @@
     "couldntOpenUpdate"
   ],
   "bn": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -51,6 +57,8 @@
     "couldntOpenUpdate"
   ],
   "cs": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -68,6 +76,8 @@
     "couldntOpenUpdate"
   ],
   "da": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -85,6 +95,8 @@
     "couldntOpenUpdate"
   ],
   "de": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -102,6 +114,8 @@
     "couldntOpenUpdate"
   ],
   "el": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -119,6 +133,8 @@
     "couldntOpenUpdate"
   ],
   "es": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -136,6 +152,8 @@
     "couldntOpenUpdate"
   ],
   "fa": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -153,6 +171,8 @@
     "couldntOpenUpdate"
   ],
   "fi": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -170,6 +190,8 @@
     "couldntOpenUpdate"
   ],
   "fr": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -187,6 +209,8 @@
     "couldntOpenUpdate"
   ],
   "he": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -204,6 +228,8 @@
     "couldntOpenUpdate"
   ],
   "hi": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -221,6 +247,8 @@
     "couldntOpenUpdate"
   ],
   "hr": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -238,6 +266,8 @@
     "couldntOpenUpdate"
   ],
   "hu": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -255,6 +285,8 @@
     "couldntOpenUpdate"
   ],
   "id": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -272,6 +304,8 @@
     "couldntOpenUpdate"
   ],
   "it": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -289,6 +323,8 @@
     "couldntOpenUpdate"
   ],
   "ja": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -306,6 +342,8 @@
     "couldntOpenUpdate"
   ],
   "ko": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -323,6 +361,8 @@
     "couldntOpenUpdate"
   ],
   "mr": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -340,6 +380,8 @@
     "couldntOpenUpdate"
   ],
   "ms": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -357,6 +399,8 @@
     "couldntOpenUpdate"
   ],
   "nb": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -374,6 +418,8 @@
     "couldntOpenUpdate"
   ],
   "nl": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -391,6 +437,8 @@
     "couldntOpenUpdate"
   ],
   "pl": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -408,6 +456,8 @@
     "couldntOpenUpdate"
   ],
   "ro": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -425,6 +475,8 @@
     "couldntOpenUpdate"
   ],
   "ru": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -442,6 +494,8 @@
     "couldntOpenUpdate"
   ],
   "sk": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -459,6 +513,8 @@
     "couldntOpenUpdate"
   ],
   "sr": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -476,6 +532,8 @@
     "couldntOpenUpdate"
   ],
   "sv": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -493,6 +551,8 @@
     "couldntOpenUpdate"
   ],
   "ta": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -510,6 +570,8 @@
     "couldntOpenUpdate"
   ],
   "te": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -527,6 +589,8 @@
     "couldntOpenUpdate"
   ],
   "th": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -544,6 +608,8 @@
     "couldntOpenUpdate"
   ],
   "tl": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -561,6 +627,8 @@
     "couldntOpenUpdate"
   ],
   "tr": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -578,6 +646,8 @@
     "couldntOpenUpdate"
   ],
   "uk": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -595,6 +665,8 @@
     "couldntOpenUpdate"
   ],
   "ur": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -612,6 +684,8 @@
     "couldntOpenUpdate"
   ],
   "vi": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
@@ -629,6 +703,8 @@
     "couldntOpenUpdate"
   ],
   "zh": [
+    "replaceSticker",
+    "animatedStickerCropUnavailable",
     "couldntExportPacks",
     "tryExportAgain",
     "checkForUpdates",
