@@ -56,8 +56,13 @@ class StickerPack {
   }
 
   void onEdit() {
-    savePacks(packs);
+    // Bump before saving: savePacks() serialises the pack synchronously, so
+    // the new version has to be in place while the JSON is built. Saving
+    // first would persist the previous imageDataVersion, and WhatsApp refuses
+    // to refresh a pack whose version it has already seen — the replaced
+    // sticker would never show up.
     imageDataVersion = (int.parse(imageDataVersion) + 1).toString();
+    savePacks(packs);
   }
 
   Map<String, Object?> toJson() {

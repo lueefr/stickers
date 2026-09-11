@@ -51,6 +51,8 @@
   "editSticker": "Edit sticker",
   "associatedEmojis": "Associated emojis",
   "deleteSticker": "Delete sticker",
+  "replaceSticker": "Replace",
+  "animatedStickerCropUnavailable": "Animated stickers can't be cropped. Replace it with a new video or GIF instead.",
   "pleaseProvideAtLeastOneEmoji": "Please provide at least one emoji",
   "pleaseProvideAtmost3Emojis": "Please provide at most 3 emojis",
   "pleaseEnterOnlyEmojis": "Please enter only emojis",

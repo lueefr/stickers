@@ -48,6 +48,8 @@
   "editSticker": "Editar figurinha",
   "associatedEmojis": "Emojis associados",
   "deleteSticker": "Excluir figurinha",
+  "replaceSticker": "Substituir",
+  "animatedStickerCropUnavailable": "Figurinhas animadas não podem ser cortadas. Substitua por um novo vídeo ou GIF.",
   "pleaseProvideAtLeastOneEmoji": "Forneça pelo menos um emoji",
   "pleaseProvideAtmost3Emojis": "Forneça no máximo 3 emojis",
   "pleaseEnterOnlyEmojis": "Insira apenas emojis",

@@ -21,11 +21,22 @@ void main() {
   late File stickerFile;
   late StickerPack pack;
 
+  StickerPack buildPack({bool animated = false}) {
+    return StickerPack(
+      'test pack',
+      'author',
+      'pack_test',
+      [Sticker(stickerFile.path, ['❤'])],
+      '1',
+      animated,
+    );
+  }
+
   setUp(() async {
     tmp = await Directory.systemTemp.createTemp('sticker_sheet_test');
     stickerFile = File('${tmp.path}/sticker_0.webp');
     await stickerFile.writeAsBytes(base64Decode(_kPng1x1));
-    pack = StickerPack('test pack', 'author', 'pack_test', [Sticker(stickerFile.path, ['❤'])], '1', false);
+    pack = buildPack();
     // onEdit() -> savePacks() touches these globals.
     packs = [pack];
     packsDir = tmp.path;
@@ -64,6 +75,7 @@ void main() {
     expect(find.text('Associated emojis'), findsOneWidget);
     expect(find.text('Delete sticker'), findsOneWidget);
     expect(find.text('Done'), findsOneWidget);
+    expect(find.text('Replace'), findsOneWidget);
     expect(find.byType(Image), findsWidgets);
   });
 
@@ -87,8 +99,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Edit sticker'), findsOneWidget);
 
-    // The sheet's Edit button (the app bar also has one, so pick the last).
-    await tester.tap(find.byIcon(Icons.edit).last);
+    // The sheet's crop/edit button.
+    await tester.tap(find.byIcon(Icons.crop_free));
     await tester.pumpAndSettle();
 
     expect(pushedRoute, '/crop');
@@ -98,13 +110,66 @@ void main() {
     expect(find.text('crop page'), findsOneWidget);
   });
 
-  testWidgets('done saves the emojis over the sticker', (tester) async {
-    String? result = 'sentinel';
+  testWidgets('the sheet reports the replace action', (tester) async {
+    bool resolved = false;
+    StickerSheetAction? action;
     await tester.pumpWidget(app(
       home: Scaffold(
         body: Builder(
           builder: (context) => ElevatedButton(
-            onPressed: () => EditStickerDialog.show(context, pack, 0).then((r) => result = r),
+            onPressed: () => EditStickerDialog.show(context, pack, 0).then((r) {
+              resolved = true;
+              action = r;
+            }),
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Replace'));
+    await tester.pumpAndSettle();
+
+    expect(resolved, isTrue);
+    expect(action, StickerSheetAction.replace);
+  });
+
+  testWidgets('replacing an animated sticker offers video and gif sources', (tester) async {
+    final animatedPack = buildPack(animated: true);
+    packs = [animatedPack];
+    await tester.pumpWidget(app(home: StickerPackPage(animatedPack, () {})));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(Image).first);
+    await tester.pumpAndSettle();
+
+    // Animated stickers cannot go through the single-frame crop screen.
+    final cropButton = tester.widget<OutlinedButton>(
+      find.ancestor(of: find.byIcon(Icons.crop_free), matching: find.byType(OutlinedButton)),
+    );
+    expect(cropButton.onPressed, isNull);
+    expect(find.textContaining("Animated stickers can't be cropped"), findsOneWidget);
+
+    await tester.tap(find.text('Replace'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Video'), findsOneWidget);
+    expect(find.text('GIF'), findsOneWidget);
+  });
+
+  testWidgets('done saves the emojis over the sticker', (tester) async {
+    bool resolved = false;
+    StickerSheetAction? action;
+    await tester.pumpWidget(app(
+      home: Scaffold(
+        body: Builder(
+          builder: (context) => ElevatedButton(
+            onPressed: () => EditStickerDialog.show(context, pack, 0).then((r) {
+              resolved = true;
+              action = r;
+            }),
             child: const Text('open'),
           ),
         ),
@@ -119,7 +184,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(pack.stickers.single.emojis, ['🔥']);
-    expect(result, isNull);
+    expect(resolved, isTrue);
+    expect(action, isNull);
   });
 
   testWidgets('delete removes the sticker from the pack', (tester) async {

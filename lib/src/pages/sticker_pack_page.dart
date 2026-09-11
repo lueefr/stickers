@@ -137,26 +137,32 @@ class StickerPackPageState extends State<StickerPackPage> {
                                   onTap: () {
                                     EditStickerDialog.show(context, widget.pack, index).then(
                                       (action) {
-                                        if (action == "edit") {
-                                          // The sheet can rebuild (or drop) this grid cell
-                                          // while it is open, so navigate from the page's own
-                                          // context instead of the cell one.
-                                          // Go through the crop screen first; the final save
-                                          // (addToPack) replaces the sticker at `index`
-                                          // in-place, overwriting the edited sticker.
-                                          if (!mounted) return;
-                                          Navigator.of(this.context)
-                                              .pushNamed(
-                                                "/crop",
-                                                arguments: EditArguments(
-                                                  pack: widget.pack,
-                                                  index: index,
-                                                  mediaPath: widget.pack.stickers[index].source,
-                                                ),
-                                              )
-                                              .then((_) => setState(() {}));
-                                        } else {
-                                          setState(() {});
+                                        // The sheet can rebuild (or drop) this grid cell
+                                        // while it is open, so navigate from the page's own
+                                        // context instead of the cell one.
+                                        if (!mounted) return;
+                                        switch (action) {
+                                          case StickerSheetAction.edit:
+                                            // Go through the crop screen first; the final save
+                                            // (addToPack) replaces the sticker at `index`
+                                            // in-place, overwriting the edited sticker.
+                                            Navigator.of(this.context)
+                                                .pushNamed(
+                                                  "/crop",
+                                                  arguments: EditArguments(
+                                                    pack: widget.pack,
+                                                    index: index,
+                                                    mediaPath: widget.pack.stickers[index].source,
+                                                  ),
+                                                )
+                                                .then((_) => setState(() {}));
+                                          case StickerSheetAction.replace:
+                                            // New media in the very same slot: the position
+                                            // and the emojis of the sticker are kept.
+                                            _replaceSticker(index);
+                                          case null:
+                                            // Dismissed, emojis saved or sticker deleted.
+                                            setState(() {});
                                         }
                                       },
                                     );
@@ -228,6 +234,22 @@ class StickerPackPageState extends State<StickerPackPage> {
       await _showAnimatedStickerOptions(index);
     } else {
       await _showStaticStickerOptions(index);
+    }
+  }
+
+  /// Puts new media in the slot currently used by the sticker at [index].
+  ///
+  /// Every editor in the chain is handed the index of the sticker being
+  /// replaced, so the final save (addToPack) overwrites that sticker instead
+  /// of appending a new one — its position in the pack and its emojis stay
+  /// untouched.
+  Future<void> _replaceSticker(int index) async {
+    if (index < 0 || index >= widget.pack.stickers.length) return;
+    if (widget.pack.animated) {
+      // An animated sticker is a video/GIF, so offer those sources again.
+      await _showAnimatedStickerOptions(index);
+    } else {
+      await _pickAndEditSingleImage(index);
     }
   }
 
