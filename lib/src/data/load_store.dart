@@ -319,7 +319,7 @@ Future<Rect?> visibleContentBounds(Uint8List rawImageData, [double rotation = 0]
   try {
     final Uint8List? preview = await ImageEditor.editImage(image: rawImageData, imageEditorOption: option);
     if (preview == null) return null;
-    return _contentBounds(preview, null);
+    return await _contentBounds(preview, null);
   } catch (_) {
     // Failing to measure only costs the trim, the stretch itself still works.
     return null;
@@ -378,7 +378,7 @@ Future<Rect?> _contentBounds(Uint8List encoded, int? targetWidth) async {
 /// [degrees], i.e. the bounding box of the rotated image.
 ///
 /// Quarter turns, the only angles [stretchRegion] maps, are exact.
-Size rotatedImageSize(Size size, double degrees) {
+Size rotatedImageSize(Size size, int degrees) {
   final double radians = degrees * math.pi / 180;
   final double cosine = math.cos(radians).abs();
   final double sine = math.sin(radians).abs();
