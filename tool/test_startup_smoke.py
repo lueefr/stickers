@@ -7,6 +7,7 @@ baseline on a loaded runner. These tests replay that transcript against stubs.
 import io
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -115,6 +116,13 @@ class FakeAdb:
         return [call for call in self.calls if call[:3] == ('shell', 'am', 'start')]
 
 
+class FakeProc:
+    def __init__(self, returncode, stdout='', stderr=''):
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
+
+
 class StartupSmokeTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -131,6 +139,36 @@ class StartupSmokeTest(unittest.TestCase):
         smoke.adb = fake
         return fake
 
+    def stub_run(self, procs):
+        """Route subprocess.run to scripted results; count recover_adb calls."""
+        queue = list(procs)
+        recovered = []
+        self.addCleanup(setattr, smoke.subprocess, 'run', smoke.subprocess.run)
+        smoke.subprocess.run = lambda cmd, **kwargs: queue.pop(0)
+        self.addCleanup(setattr, smoke, 'recover_adb', smoke.recover_adb)
+        smoke.recover_adb = lambda: recovered.append(True)
+        return recovered
+
+    def test_adb_retries_a_transient_transport_fault(self):
+        # The exact CI symptom: `adb logcat -d` exits 255 "device offline" once,
+        # then the device comes back. adb() must recover, not propagate.
+        self.stub_run([FakeProc(255, '', 'error: device offline'), FakeProc(0, 'ok-output\n')])
+        self.assertEqual(smoke.adb('logcat', '-d', '-v', 'threadtime'), 'ok-output\n')
+
+    def test_adb_raises_immediately_on_a_real_command_failure(self):
+        # `adb install` exit 1 (e.g. INSTALL_FAILED_UPDATE_INCOMPATIBLE) is a
+        # verdict, not a transport fault: it must surface so the release fails.
+        self.stub_run([FakeProc(1, '', 'Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE]')])
+        with self.assertRaises(subprocess.CalledProcessError) as caught:
+            smoke.adb('install', '-r', 'app.apk')
+        self.assertEqual(caught.exception.returncode, 1)
+
+    def test_adb_gives_up_after_exhausting_transport_retries(self):
+        recovered = self.stub_run([FakeProc(255, '', 'error: closed')] * smoke.ADB_TRANSPORT_RETRIES)
+        with self.assertRaises(subprocess.CalledProcessError):
+            smoke.adb('shell', 'getprop')
+        self.assertEqual(len(recovered), smoke.ADB_TRANSPORT_RETRIES - 1)
+
     def test_parses_the_real_ci_transcript(self):
         self.assertEqual(smoke.parse_launch(TIMEOUT_LAUNCH)['state'], 'timeout')
         self.assertEqual(smoke.parse_launch(TIMEOUT_LAUNCH)['wait_ms'], 12265)
@@ -138,6 +176,10 @@ class StartupSmokeTest(unittest.TestCase):
         self.assertEqual((ok['state'], ok['total_ms'], ok['wait_ms']), ('ok', 2310, 2320))
         self.assertEqual(smoke.parse_launch(NO_TOTAL_LAUNCH)['state'], 'incomplete')
         self.assertEqual(smoke.parse_launch('Error: Activity not started')['state'], 'error')
+        # A bare/trailing "Error: " must not crash the parser (release path).
+        self.assertEqual(smoke.parse_launch('Error: ')['state'], 'error')
+        self.assertEqual(smoke.parse_launch('Error:')['state'], 'error')
+        self.assertEqual(smoke.parse_launch('')['state'], 'error')
 
     def test_launch_retries_a_timeout_and_reports_attempts(self):
         fake = self.use([TIMEOUT_LAUNCH, OK_LAUNCH])
@@ -272,8 +314,9 @@ class StartupSmokeTest(unittest.TestCase):
 
     def run_main(self, fake):
         """Wire stubs + real APK files, run main(), return (stdout, paths)."""
-        def fake_run(cmd, check=False, stdout=None, timeout=None):
-            if stdout is not None:
+        def fake_run(cmd, **kwargs):
+            stdout = kwargs.get('stdout')
+            if stdout is not None and hasattr(stdout, 'write'):
                 stdout.write(b'png')
 
             class Result:
@@ -282,6 +325,8 @@ class StartupSmokeTest(unittest.TestCase):
 
         self.addCleanup(setattr, smoke, 'adb', smoke.adb)
         smoke.adb = fake
+        self.addCleanup(setattr, smoke, 'recover_adb', smoke.recover_adb)
+        smoke.recover_adb = lambda: None  # no real device to reconnect in tests
         self.addCleanup(setattr, smoke.subprocess, 'run', smoke.subprocess.run)
         smoke.subprocess.run = fake_run
 

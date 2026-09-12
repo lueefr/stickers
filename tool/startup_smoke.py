@@ -28,6 +28,17 @@ OUT = Path('build/startup')
 # timeout is only the outer safety net for a wedged transport.
 ADB_TIMEOUT = 120
 LAUNCH_ATTEMPTS = 3
+# A shared CI emulator occasionally drops adb mid-run: `adb` exits 255 with
+# "device offline"/"closed" even though the app is fine. That is a transport
+# fault, not a verdict on the APK, so it is retried after a reconnect. Genuine
+# command failures (e.g. `adb install` exit 1 on INSTALL_FAILED_*) are not.
+ADB_TRANSPORT_RETRIES = 3
+ADB_TRANSPORT_MARKERS = (
+    'device offline', 'device unauthorized', 'device still authorizing',
+    'no devices/emulators found', 'device not found', 'error: closed',
+    'adb: failed to connect', 'cannot connect to', 'unknown host service',
+    'protocol fault', 'connection refused', 'adb: no devices',
+)
 # The baseline is a debug/JIT build: its first open pays dexopt/JIT warm-up and
 # is not comparable with the restarts, so it is launched once and discarded.
 BASELINE_WARMUP_ATTEMPTS = 3
@@ -37,8 +48,30 @@ BASELINE_WARMUP_ATTEMPTS = 3
 BASELINE_SAMPLES = 6
 
 
+def recover_adb():
+    """Best-effort: bring a dropped device back before the next adb call."""
+    for cmd in (['adb', 'reconnect', 'offline'], ['adb', 'wait-for-device']):
+        try:
+            subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        except (subprocess.TimeoutExpired, OSError):
+            pass
+
+
 def adb(*args, timeout=ADB_TIMEOUT):
-    return subprocess.check_output(['adb', *args], timeout=timeout, text=True)
+    """Run one adb command, retrying transient transport faults (exit 255)."""
+    cmd = ['adb', *args]
+    for attempt in range(ADB_TRANSPORT_RETRIES):
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        if proc.returncode == 0:
+            return proc.stdout
+        detail = f'{proc.stderr}\n{proc.stdout}'.lower()
+        transient = proc.returncode == 255 or any(m in detail for m in ADB_TRANSPORT_MARKERS)
+        if transient and attempt < ADB_TRANSPORT_RETRIES - 1:
+            recover_adb()
+            time.sleep(1 + attempt)
+            continue
+        raise subprocess.CalledProcessError(proc.returncode, cmd, proc.stdout, proc.stderr)
+    raise subprocess.CalledProcessError(255, cmd)  # unreachable; satisfies linters
 
 
 def parse_launch(output):
@@ -47,7 +80,8 @@ def parse_launch(output):
     wait = re.search(r'WaitTime:\s*(\d+)', output or '')
     reason = ''
     if 'Error: ' in (output or ''):
-        reason = output.split('Error: ', 1)[1].strip().splitlines()[0]
+        detail = output.split('Error: ', 1)[1].strip()
+        reason = detail.splitlines()[0] if detail else 'unspecified adb/am error'
     elif 'Status: timeout' in (output or ''):
         reason = 'activity did not report a launch state within the framework window'
     elif 'Status: ok' not in (output or ''):
@@ -284,6 +318,9 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     try:
         baseline = baseline_starts(args.baseline) if args.baseline else None
+        # The 171 MiB JIT baseline can leave adb/emulator unstable; reclaim a
+        # clean device before measuring the release APK that actually ships.
+        recover_adb()
         install_apk(args.apk)
         results = [run_start(i) for i in range(6)]
         # Separate first-install initialization from process-cold/cache-warm

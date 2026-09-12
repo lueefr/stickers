@@ -110,6 +110,18 @@ aberturas medidas; a comparação usa a mediana das reinicializações, não o
 warm-up. Quando o baseline precisa de retry, isso é declarado na anotação de
 comparação — a variabilidade do emulador fica visível em vez de ser escondida.
 
+Há dois níveis de retry, bem separados. **Transporte**: num emulador de CI
+compartilhado o `adb` às vezes cai no meio do run e devolve exit 255
+(`device offline`/`closed`); isso é falha de comunicação, não veredito sobre o
+APK, então `adb()` reconecta (`adb reconnect offline` + `wait-for-device`) e
+repete até 3× — e há um `recover_adb()` entre o baseline e o release para o APK
+novo ser medido num dispositivo limpo. **App**: `Status: timeout` do framework,
+crash (`FATAL EXCEPTION`/`Fatal signal`/`[ERROR:flutter`) ou home que não aparece
+em 30 s continuam sendo falha real. Falha de transporte nunca vira tempo nem
+mascara crash; falha de app no release continua fatal (crash não tem retry), e
+`adb install` com erro real (ex.: `INSTALL_FAILED_UPDATE_INCOMPATIBLE`, exit 1)
+não é tratado como transporte — sobe na hora.
+
 Para medir no celular conectado (ADB habilitado):
 
 ```sh
