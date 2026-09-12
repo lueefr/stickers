@@ -227,7 +227,10 @@ class StickersAppState extends State<StickersApp> {
   }
 
   Future<void> _quickAdd(SharedMedia media, String defaultTitle, String defaultAuthor) async {
-    final rawImageData = File(media.attachments!.first!.path).readAsBytesSync();
+    // Async read: this runs right after the app is resumed from a share, so a
+    // synchronous read of the shared file would block the UI isolate for the
+    // first frames of the navigation below.
+    final rawImageData = await File(media.attachments!.first!.path).readAsBytes();
     final pack = packs.firstWhere((pack) => pack.stickers.length < 30 && !pack.animated, orElse: () {
       final pack = StickerPack(
         defaultTitle,

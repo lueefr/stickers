@@ -105,6 +105,10 @@ class _EditStickerDialogState extends State<EditStickerDialog> {
                   File(widget.pack.stickers[widget.index].source),
                   width: double.infinity,
                   height: 256,
+                  // Stickers are at most 512x512, so decoding at 512 is never an
+                  // upscale and keeps the preview sharp at any dialog width.
+                  cacheWidth: 512,
+                  cacheHeight: 512,
                   gaplessPlayback: true,
                   fit: BoxFit.contain,
                 ),

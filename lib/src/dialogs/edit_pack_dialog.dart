@@ -61,6 +61,11 @@ class _EditPackDialogState extends State<EditPackDialog> {
                         Positioned.fill(
                           child: Image.file(
                             File(widget.pack.trayIcon ?? widget.pack.stickers.first.source),
+                            // Stickers are at most 512x512 and the tray icon is
+                            // shown in a 150x150 box: decode at ~2x that, like
+                            // the other previews do.
+                            cacheWidth: 300,
+                            cacheHeight: 300,
                             fit: BoxFit.contain,
                           ),
                         ),
