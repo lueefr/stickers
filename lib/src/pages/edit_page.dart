@@ -87,7 +87,17 @@ class _EditPageState extends State<EditPage> {
         setState(() {});
       });
     } else {
-      _basePicture = Image.file(_source, fit: BoxFit.fill, gaplessPlayback: true);
+      // The editor canvas is at most 512 logical pixels. Decoding the source at
+      // its camera resolution wastes memory and makes the first frame compete
+      // with the gesture UI; export still uses the original file below.
+      _basePicture = Image.file(
+        _source,
+        fit: BoxFit.fill,
+        cacheWidth: 1024,
+        cacheHeight: 1024,
+        gaplessPlayback: true,
+        filterQuality: FilterQuality.low,
+      );
     }
     //_sticker = _pack.stickers[widget.index];
   }

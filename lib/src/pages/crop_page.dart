@@ -33,6 +33,7 @@ class CropPage extends StatefulWidget {
 
 class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
   late final AnimationController _maskColorController;
+  late final CurvedAnimation _maskColorAnimation;
   final ImageEditorController _editorController = ImageEditorController();
 
   bool _previousPtrVal = false;
@@ -41,20 +42,16 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     _maskColorController = AnimationController(vsync: this);
-    Tween<double> tween = Tween(begin: 0.0, end: 1.0);
-    Animation anim = CurvedAnimation(
-        parent: _maskColorController, curve: Curves.ease, reverseCurve: Curves.ease);
-    anim.drive(tween);
-    _maskColorController.addListener(_animationListener);
-  }
-
-  void _animationListener() {
-    setState(() {});
+    _maskColorAnimation = CurvedAnimation(
+      parent: _maskColorController,
+      curve: Curves.ease,
+      reverseCurve: Curves.ease,
+    );
   }
 
   @override
   void dispose() {
-    _maskColorController.removeListener(_animationListener);
+    _maskColorAnimation.dispose();
     _maskColorController.dispose();
     super.dispose();
   }
@@ -149,8 +146,13 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
                 // See: https://github.com/lolocomotive/stickers/issues/1
                 clipBehavior: Clip.antiAlias,
                 decoration: const BoxDecoration(),
-                child: ExtendedImage.file(
-                  File(widget.imagePath),
+                // The mask animation used to call setState on this entire page
+                // for every tick, rebuilding all controls and the editor. Keep
+                // the animation confined to the image editor subtree.
+                child: AnimatedBuilder(
+                  animation: _maskColorAnimation,
+                  builder: (context, _) => ExtendedImage.file(
+                    File(widget.imagePath),
                   fit: BoxFit.contain,
                   beforePaintImage: (canvas, rect, image, paint) {
                     CheckerPainter.checkerPainter(canvas, rect, context);
@@ -172,7 +174,7 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
                         return Color.lerp(
                           Theme.of(context).colorScheme.surface.withAlpha(50),
                           Theme.of(context).colorScheme.surface.withAlpha(200),
-                          _maskColorController.value,
+                          _maskColorAnimation.value,
                         )!;
                       },
                       animationCurve: Curves.ease,
@@ -189,6 +191,7 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
                       controller: _editorController,
                     );
                   },
+                ),
                 ),
               ),
             ),

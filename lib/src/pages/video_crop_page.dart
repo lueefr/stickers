@@ -1,8 +1,6 @@
-import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
-import 'package:extended_image/extended_image.dart' hide MediaType;
 import 'package:flutter/material.dart';
 import 'package:stickers/generated/intl/app_localizations.dart';
 import 'package:stickers/src/constants.dart';
@@ -18,9 +16,8 @@ class VideoCropPage extends StatefulWidget {
   final StickerPack pack;
   final int index;
   final String imagePath;
-  final GlobalKey<ExtendedImageEditorState> editorKey = GlobalKey<ExtendedImageEditorState>();
 
-  VideoCropPage({
+  const VideoCropPage({
     required this.pack,
     required this.index,
     required this.imagePath,
@@ -33,70 +30,74 @@ class VideoCropPage extends StatefulWidget {
   State<VideoCropPage> createState() => _VideoCropPageState();
 }
 
-class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateMixin {
-  late final AnimationController _maskColorController;
+class _VideoCropPageState extends State<VideoCropPage> {
   late final VideoPlayerController _controller;
-  double _btnOpacity = 1;
+  final ValueNotifier<double> _buttonOpacity = ValueNotifier<double>(1);
+  final ValueNotifier<RangeValues> _rangeNotifier = ValueNotifier<RangeValues>(RangeValues(0, 1));
+  final ValueNotifier<bool> _editingNotifier = ValueNotifier<bool>(false);
+
   bool _ready = false;
   bool _exporting = false;
   int _rotationDegrees = 0;
   bool _cropToSquare = true;
   RangeValues _range = RangeValues(0, 1);
-  Duration _seekTarget = Duration();
+  Duration _seekTarget = Duration.zero;
+  bool _canSeek = true;
+  bool _editing = false;
+  final CropAndScaleService service = CropAndScaleService();
 
   @override
   void initState() {
     super.initState();
-    _maskColorController = AnimationController(vsync: this);
-    Tween<double> tween = Tween(begin: 0.0, end: 1.0);
-    Animation anim = CurvedAnimation(
-        parent: _maskColorController, curve: Curves.ease, reverseCurve: Curves.ease);
-    anim.drive(tween);
-    _maskColorController.addListener(_animationListener);
     _controller = VideoPlayerController.file(
       File(widget.imagePath),
-      viewType: VideoViewType.platformView,
+      // Texture composition avoids the extra platform-view layer while the
+      // trim controls are being dragged. It also matches the editor preview.
+      viewType: VideoViewType.textureView,
       videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
     );
-    _controller.initialize().onError((e, st) {
-      if (mounted) {
-        showDialog(
-            context: context,
-            builder: (context) {
-              return ErrorDialog(
-                title: AppLocalizations.of(context)!.couldntLoadVideo,
-                message: e.toString(),
-              );
-            }).then(Navigator.of(context).pop);
-      }
-    }).then((_) => setState(() {
-          _ready = true;
-        }));
-    _controller.addListener(_videoListener);
     _controller.setVolume(0);
+    _controller.addListener(_videoListener);
+    _initializeVideo();
+  }
+
+  Future<void> _initializeVideo() async {
+    try {
+      await _controller.initialize();
+      if (!mounted) return;
+      setState(() => _ready = true);
+    } catch (e) {
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => ErrorDialog(
+          title: AppLocalizations.of(context)!.couldntLoadVideo,
+          message: e.toString(),
+        ),
+      );
+      if (mounted && Navigator.of(context).canPop()) Navigator.of(context).pop();
+    }
   }
 
   void _videoListener() {
     if (_editing) return;
     // No setState here on purpose: the player fires this listener on every
-    // video frame, so the play button and the progress indicator below listen
-    // to the controller directly and rebuild only themselves.
+    // video frame. The play button and progress indicator listen directly to
+    // the controller and rebuild only their small subtrees.
     if (_controller.value.position > _controller.value.duration * _range.end) {
       _requestSeek(_controller.value.duration * _range.start);
     }
-  }
-
-  void _animationListener() {
-    setState(() {});
   }
 
   @override
   void dispose() {
     // Dispose the controllers before super.dispose() so pending video
     // callbacks can no longer hit setState() on a disposed State.
-    _maskColorController.removeListener(_animationListener);
-    _maskColorController.dispose();
+    _controller.removeListener(_videoListener);
     _controller.dispose();
+    _buttonOpacity.dispose();
+    _rangeNotifier.dispose();
+    _editingNotifier.dispose();
     service.dispose();
     super.dispose();
   }
@@ -120,57 +121,69 @@ class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateM
                 child: Stack(
                   children: [
                     Center(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          border: _cropToSquare
-                              ? Border.all(color: Theme.of(context).colorScheme.primary, width: 3)
-                              : null,
-                        ),
-                        width: _cropToSquare ? min(MediaQuery.of(context).size.width, MediaQuery.of(context).size.height) : null,
-                        height: _cropToSquare ? min(MediaQuery.of(context).size.width, MediaQuery.of(context).size.height) : null,
-                        clipBehavior: Clip.antiAlias,
-                        child: Transform.rotate(
-                          angle: _rotationDegrees * pi / 180,
-                          child: AspectRatio(
-                            aspectRatio: _rotationDegrees % 180 == 0
-                                ? _controller.value.aspectRatio
-                                : 1 / _controller.value.aspectRatio,
-                            child: VideoPlayer(_controller),
-                          ),
-                        ),
-                      ),
+                      child: _ready
+                          ? Container(
+                              decoration: BoxDecoration(
+                                border: _cropToSquare
+                                    ? Border.all(color: Theme.of(context).colorScheme.primary, width: 3)
+                                    : null,
+                              ),
+                              width: _cropToSquare
+                                  ? min(MediaQuery.of(context).size.width, MediaQuery.of(context).size.height)
+                                  : null,
+                              height: _cropToSquare
+                                  ? min(MediaQuery.of(context).size.width, MediaQuery.of(context).size.height)
+                                  : null,
+                              clipBehavior: Clip.antiAlias,
+                              child: Transform.rotate(
+                                angle: _rotationDegrees * pi / 180,
+                                child: AspectRatio(
+                                  aspectRatio: _rotationDegrees % 180 == 0
+                                      ? _controller.value.aspectRatio
+                                      : 1 / _controller.value.aspectRatio,
+                                  child: VideoPlayer(_controller),
+                                ),
+                              ),
+                            )
+                          : const CircularProgressIndicator(),
                     ),
-                    Center(
-                      child: ValueListenableBuilder<VideoPlayerValue>(
-                        valueListenable: _controller,
-                        builder: (context, value, _) {
-                          if (!value.isPlaying) {
-                            return IconButton(
-                              onPressed: _play,
-                              icon: const Icon(
-                                Icons.play_arrow,
-                                color: Colors.white,
-                                shadows: [Shadow(color: Colors.black, blurRadius: 32)],
-                              ),
-                              iconSize: 100,
+                    if (_ready)
+                      Center(
+                        child: ValueListenableBuilder<VideoPlayerValue>(
+                          valueListenable: _controller,
+                          builder: (context, value, _) {
+                            final button = value.isPlaying
+                                ? IconButton(
+                                    onPressed: _controller.pause,
+                                    icon: const Icon(
+                                      Icons.pause,
+                                      color: Colors.white,
+                                      shadows: [Shadow(color: Colors.black, blurRadius: 32)],
+                                    ),
+                                    iconSize: 100,
+                                  )
+                                : IconButton(
+                                    onPressed: _play,
+                                    icon: const Icon(
+                                      Icons.play_arrow,
+                                      color: Colors.white,
+                                      shadows: [Shadow(color: Colors.black, blurRadius: 32)],
+                                    ),
+                                    iconSize: 100,
+                                  );
+                            return ValueListenableBuilder<double>(
+                              valueListenable: _buttonOpacity,
+                              builder: (context, opacity, _) => value.isPlaying
+                                  ? AnimatedOpacity(
+                                      opacity: opacity,
+                                      duration: const Duration(milliseconds: 300),
+                                      child: button,
+                                    )
+                                  : button,
                             );
-                          }
-                          return AnimatedOpacity(
-                            opacity: _btnOpacity,
-                            duration: const Duration(milliseconds: 300),
-                            child: IconButton(
-                              onPressed: () => _controller.pause(),
-                              icon: const Icon(
-                                Icons.pause,
-                                color: Colors.white,
-                                shadows: [Shadow(color: Colors.black, blurRadius: 32)],
-                              ),
-                              iconSize: 100,
-                            ),
-                          );
-                        },
+                          },
+                        ),
                       ),
-                    )
                   ],
                 ),
               ),
@@ -178,9 +191,7 @@ class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateM
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(
-                  height: 10,
-                ),
+                const SizedBox(height: 10),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                   child: Row(
@@ -213,57 +224,43 @@ class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateM
                 ),
                 Stack(
                   children: [
-                    RangeSlider(
-                        values: _range,
-                        onChangeEnd: (_) async {
-                          if (_seekTarget == _controller.value.duration * _range.end) {
-                            _requestSeek(_controller.value.duration * _range.end -
-                                const Duration(seconds: 1));
-                            if (_seekTarget < _controller.value.duration * _range.start) {
-                              _seekTarget = _controller.value.duration * _range.start;
-                            }
-                          }
-                          _play();
-                          await Future.delayed(const Duration(milliseconds: 200));
-                          if (!mounted) return;
-                          _editing = false;
-                          setState(() {});
-                        },
+                    // Range changes are isolated from the video preview. The
+                    // old implementation rebuilt the platform view for every
+                    // pointer event, which made trimming visibly stutter.
+                    ValueListenableBuilder<RangeValues>(
+                      valueListenable: _rangeNotifier,
+                      builder: (context, range, _) => RangeSlider(
+                        values: range,
                         onChangeStart: (_) {
                           _controller.pause();
                           _editing = true;
+                          _editingNotifier.value = true;
                         },
-                        onChanged: (values) {
-                          final Duration seekTarget;
-                          if (_range.start != values.start) {
-                            seekTarget = _controller.value.duration * values.start;
-                          } else if (_range.end != values.end) {
-                            seekTarget = _controller.value.duration * values.end;
-                          } else {
-                            return;
-                          }
-                          _requestSeek(seekTarget);
-                          _range = values;
-                          setState(() {});
-                        }),
+                        onChanged: _onRangeChanged,
+                        onChangeEnd: (_) => _finishRangeEdit(),
+                      ),
+                    ),
                     ValueListenableBuilder<VideoPlayerValue>(
                       valueListenable: _controller,
-                      builder: (context, value, _) {
-                        if (_editing || !_ready) return const SizedBox.shrink();
-                        final durationMs = value.duration.inMilliseconds;
-                        if (durationMs <= 0) return const SizedBox.shrink();
-                        final progress =
-                            (value.position.inMilliseconds / durationMs).clamp(0.0, 1.0);
-                        return IgnorePointer(
-                          child: Slider(
-                            thumbColor: Theme.of(context).colorScheme.onSurface,
-                            activeColor: Colors.transparent,
-                            inactiveColor: Colors.transparent,
-                            value: progress,
-                            onChanged: (_) {},
-                          ),
-                        );
-                      },
+                      builder: (context, value, _) => ValueListenableBuilder<bool>(
+                        valueListenable: _editingNotifier,
+                        builder: (context, editing, _) {
+                          if (editing || !_ready) return const SizedBox.shrink();
+                          final durationMs = value.duration.inMilliseconds;
+                          if (durationMs <= 0) return const SizedBox.shrink();
+                          final progress =
+                              (value.position.inMilliseconds / durationMs).clamp(0.0, 1.0);
+                          return IgnorePointer(
+                            child: Slider(
+                              thumbColor: Theme.of(context).colorScheme.onSurface,
+                              activeColor: Colors.transparent,
+                              inactiveColor: Colors.transparent,
+                              value: progress,
+                              onChanged: (_) {},
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ],
                 ),
@@ -274,20 +271,19 @@ class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateM
                     style: ButtonStyle(
                       padding: WidgetStateProperty.all(EdgeInsets.zero),
                     ),
-                    onPressed: _exporting ? null : () => doCrop(),
+                    onPressed: _exporting ? null : doCrop,
                     child: Column(
                       children: [
                         const SizedBox(height: 8),
                         Text(AppLocalizations.of(context)!.done),
                         const SizedBox(height: 8),
                         if (_exporting)
-                          StreamBuilder(
-                              stream: service.progressStream,
-                              builder: (context, asyncSnapshot) {
-                                return LinearProgressIndicator(
-                                  value: asyncSnapshot.data?.progress,
-                                );
-                              })
+                          StreamBuilder<Progress>(
+                            stream: service.progressStream,
+                            builder: (context, asyncSnapshot) => LinearProgressIndicator(
+                              value: asyncSnapshot.data?.progress,
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -300,14 +296,40 @@ class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateM
     );
   }
 
-  bool _canSeek = true;
+  void _onRangeChanged(RangeValues values) {
+    final Duration seekTarget;
+    if (_range.start != values.start) {
+      seekTarget = _controller.value.duration * values.start;
+    } else if (_range.end != values.end) {
+      seekTarget = _controller.value.duration * values.end;
+    } else {
+      return;
+    }
+    _requestSeek(seekTarget);
+    _range = values;
+    _rangeNotifier.value = values;
+  }
+
+  Future<void> _finishRangeEdit() async {
+    if (_seekTarget == _controller.value.duration * _range.end) {
+      _requestSeek(_controller.value.duration * _range.end - const Duration(seconds: 1));
+      if (_seekTarget < _controller.value.duration * _range.start) {
+        _seekTarget = _controller.value.duration * _range.start;
+      }
+    }
+    _play();
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    if (!mounted) return;
+    _editing = false;
+    _editingNotifier.value = false;
+  }
 
   void _requestSeek(Duration time) async {
     _seekTarget = time;
     if (_canSeek) {
       _canSeek = false;
       await _controller.seekTo(time);
-      await Future.delayed(const Duration(milliseconds: 100));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
       _canSeek = true;
       if (_seekTarget != time) {
         _requestSeek(_seekTarget);
@@ -317,23 +339,16 @@ class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateM
 
   void _play() {
     _controller.play();
-    _btnOpacity = 1;
-    if (mounted) setState(() {});
-    Future.delayed(const Duration(seconds: 1)).then((_) {
+    _buttonOpacity.value = 1;
+    Future<void>.delayed(const Duration(seconds: 1)).then((_) {
       if (!mounted) return;
-      _btnOpacity = 0;
-      setState(() {});
+      _buttonOpacity.value = 0;
     });
   }
 
-  CropAndScaleService service = CropAndScaleService();
-
-  bool _editing = false;
-
   Future<void> doCrop() async {
-    setState(() {
-      _exporting = true;
-    });
+    if (!_ready || _exporting) return;
+    setState(() => _exporting = true);
     try {
       _controller.pause();
       final output = "$mediaCacheDir/import_${DateTime.now().millisecondsSinceEpoch}.mp4";
@@ -352,28 +367,28 @@ class _VideoCropPageState extends State<VideoCropPage> with TickerProviderStateM
           debugPrint("Transcoding failed!");
           if (mounted) {
             showDialog(
-                context: context,
-                builder: (context) {
-                  return ErrorDialog(
-                      title: AppLocalizations.of(context)!.trimFailed,
-                      message: AppLocalizations.of(context)!.trimFailedMsg);
-                });
+              context: context,
+              builder: (context) => ErrorDialog(
+                title: AppLocalizations.of(context)!.trimFailed,
+                message: AppLocalizations.of(context)!.trimFailedMsg,
+              ),
+            );
           }
           throw Exception();
         }
       }
       if (!mounted) return;
-      Navigator.of(context).pushNamed("/edit",
-          arguments: EditArguments(
-            pack: widget.pack,
-            index: widget.index,
-            mediaPath: output,
-            type: MediaType.video,
-          ));
+      Navigator.of(context).pushNamed(
+        "/edit",
+        arguments: EditArguments(
+          pack: widget.pack,
+          index: widget.index,
+          mediaPath: output,
+          type: MediaType.video,
+        ),
+      );
     } finally {
-      setState(() {
-        _exporting = false;
-      });
+      if (mounted) setState(() => _exporting = false);
     }
   }
 }

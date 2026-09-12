@@ -2,8 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:stickers/generated/intl/app_localizations.dart';
-import 'package:stickers/src/checker_painter.dart';
 import 'package:stickers/src/data/sticker_pack.dart';
+import 'package:stickers/src/widgets/sticker_thumbnail.dart';
 
 /// What the user asked the sticker sheet to do with an existing sticker.
 ///
@@ -99,19 +99,14 @@ class _EditStickerDialogState extends State<EditStickerDialog> {
             Container(
               decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
               clipBehavior: Clip.antiAlias,
-              child: CustomPaint(
-                painter: CheckerPainter(context),
-                child: Image.file(
-                  File(widget.pack.stickers[widget.index].source),
-                  width: double.infinity,
-                  height: 256,
-                  // Stickers are at most 512x512, so decoding at 512 is never an
-                  // upscale and keeps the preview sharp at any dialog width.
-                  cacheWidth: 512,
-                  cacheHeight: 512,
-                  gaplessPlayback: true,
-                  fit: BoxFit.contain,
-                ),
+              child: StickerThumbnail(
+                widget.pack.stickers[widget.index].source,
+                width: double.infinity,
+                height: 256,
+                // Stickers are at most 512x512, so decoding at 512 is never an
+                // upscale and keeps the preview sharp at any dialog width.
+                cacheWidth: 512,
+                cacheHeight: 512,
               ),
             ),
             const SizedBox(height: 16),

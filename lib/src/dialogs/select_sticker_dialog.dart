@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:stickers/generated/intl/app_localizations.dart';
@@ -13,34 +14,36 @@ class SelectStickerDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var stickers = packs.expand((p) => p.stickers).toList();
+    final stickers = packs.expand((p) => p.stickers).toList(growable: false);
     return AlertDialog(
       title: Text(AppLocalizations.of(context)!.chooseASticker),
       content: SizedBox(
-        width: 10000, //FIXME make this dynamic
-        height: 10000,
+        // The old 10000x10000 placeholder made the dialog ask the layout
+        // engine for a massive viewport. Keep the same scrollable grid, but
+        // bound it to the actual window so only visible cells are laid out.
+        width: min(MediaQuery.sizeOf(context).width - 48, 640),
+        height: min(MediaQuery.sizeOf(context).height * .7, 640),
         child: GridView.builder(
-            itemCount: stickers.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-            ),
-            itemBuilder: (context, index) {
-              return Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: [
-                    BoxShadow(
-                      offset: const Offset(1, 1),
-                      blurRadius: 3,
-                      color: Theme.of(context).brightness == Brightness.light
-                          ? Colors.black26
-                          : Colors.black12,
-                    )
-                  ],
-                ),
-                clipBehavior: Clip.antiAlias,
+          itemCount: stickers.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
+          ),
+          itemBuilder: (context, index) {
+            return Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    offset: const Offset(1, 1),
+                    blurRadius: 3,
+                    color: Theme.of(context).brightness == Brightness.light ? Colors.black26 : Colors.black12,
+                  ),
+                ],
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: RepaintBoundary(
                 child: CustomPaint(
                   painter: CheckerPainter(context),
                   child: InkWell(
@@ -57,11 +60,14 @@ class SelectStickerDialog extends StatelessWidget {
                       cacheHeight: 256,
                       gaplessPlayback: true,
                       fit: BoxFit.contain,
+                      filterQuality: FilterQuality.low,
                     ),
                   ),
                 ),
-              );
-            }),
+              ),
+            );
+          },
+        ),
       ),
     );
   }

@@ -74,8 +74,13 @@ class _TextEditingDialogState extends State<TextEditingDialog> {
           child: Stack(
           children: [
             Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Text(
-                  widget.controller.text,
+              // TextEditingController is already a ValueListenable. Rebuild
+              // only the outlined preview while typing instead of rebuilding
+              // the backdrop blur, toolbar and font PageView for every key.
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: widget.controller,
+                builder: (context, value, _) => Text(
+                  value.text,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     inherit: false,
@@ -90,12 +95,12 @@ class _TextEditingDialogState extends State<TextEditingDialog> {
                     fontFamily: widget.parent.text.fontName,
                   ),
                 ),
+              ),
             ]),
             EditableText(
               autofocus: true,
               onChanged: (_) {
                 widget.parent.text.text = widget.controller.text;
-                setState(() {});
               },
               onEditingComplete: () {
                 widget.disableEditing();

@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 import 'package:stickers/generated/intl/app_localizations.dart';
-import 'package:stickers/src/checker_painter.dart';
 import 'package:stickers/src/constants.dart';
 import 'package:stickers/src/data/load_store.dart';
 import 'package:stickers/src/data/sticker_pack.dart';
@@ -11,6 +10,7 @@ import 'package:stickers/src/dialogs/delete_confirm_dialog.dart';
 import 'package:stickers/src/dialogs/edit_pack_dialog.dart';
 import 'package:stickers/src/globals.dart';
 import 'package:stickers/src/pages/sticker_pack_page.dart';
+import 'package:stickers/src/widgets/sticker_thumbnail.dart';
 
 class StickerPackPreviewCard extends StatefulWidget {
   final StickerPack pack;
@@ -113,17 +113,12 @@ class _StickerPackPreviewCardState extends State<StickerPackPreviewCard> {
                         )
                       ]),
                       clipBehavior: Clip.antiAlias,
-                      child: CustomPaint(
-                        painter: CheckerPainter(context),
-                        child: Image.file(
-                          File(widget.pack.trayIcon ?? widget.pack.stickers.first.source),
-                          width: 48,
-                          height: 48,
-                          cacheWidth: 96,
-                          cacheHeight: 96,
-                          gaplessPlayback: true,
-                          fit: BoxFit.contain,
-                        ),
+                      child: StickerThumbnail(
+                        widget.pack.trayIcon ?? widget.pack.stickers.first.source,
+                        width: 48,
+                        height: 48,
+                        cacheWidth: 96,
+                        cacheHeight: 96,
                       ),
                     ),
                   ],
@@ -181,17 +176,10 @@ class _StickerPackPreviewCardState extends State<StickerPackPreviewCard> {
                     )
                   ]),
                   clipBehavior: Clip.antiAlias,
-                  child: CustomPaint(
-                    painter: CheckerPainter(context),
-                    child: Image.file(
-                      File(sticker.source),
-                      width: double.infinity,
-                      height: double.infinity,
-                      cacheWidth: 168,
-                      cacheHeight: 168,
-                      gaplessPlayback: true,
-                      fit: BoxFit.contain,
-                    ),
+                  child: StickerThumbnail(
+                    sticker.source,
+                    cacheWidth: 168,
+                    cacheHeight: 168,
                   ),
                 ),
               );
