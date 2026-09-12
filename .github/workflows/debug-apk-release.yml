@@ -17,9 +17,10 @@ on:
         type: string
         default: ''
 
-# Publishing a GitHub Release requires write access to repository contents.
+# Validation (including branch pushes) is read-only. Only the gated release
+# job can write repository contents after build AND emulator smoke succeed.
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: optimized-apk-${{ github.ref }}
@@ -32,6 +33,9 @@ jobs:
     timeout-minutes: 40
     outputs:
       apk-artifact: stickers-${{ steps.version.outputs.safe }}-release
+      full: ${{ steps.version.outputs.full }}
+      tag: ${{ steps.version.outputs.tag }}
+      bumped: ${{ steps.version.outputs.bumped }}
     # Defense in depth: the version-bump commit pushed below (tagged [skip ci])
     # must never trigger another release run. Pushes made with GITHUB_TOKEN
     # already don't trigger workflows; this guard covers custom tokens too.
@@ -260,12 +264,75 @@ jobs:
             build/app/outputs/mapping/release/
           retention-days: 30
 
+
+  startup-smoke:
+    name: Cold-start smoke (release, Android 35)
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          name: ${{ needs.build.outputs.apk-artifact }}
+          path: apks
+      - name: Download the historical debug baseline
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download 'v1.5.9+27' --pattern '*-debug.apk' --dir baseline --repo "$GITHUB_REPOSITORY"
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Boot and measure the actual release APK
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_2
+          disable-animations: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: python3 tool/startup_smoke.py apks/*-x86_64-release.apk --baseline baseline/*-debug.apk
+      - name: Upload startup evidence
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: startup-evidence-${{ github.run_id }}
+          path: build/startup/
+          if-no-files-found: warn
+          retention-days: 30
+
+  publish:
+    name: Publish only validated APKs
+    needs: [build, startup-smoke]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v5
+        with:
+          name: ${{ needs.build.outputs.apk-artifact }}
+          path: build/apks
+      - name: Restore the version validated by the build
+        env:
+          FULL_VERSION: ${{ needs.build.outputs.full }}
+        run: python3 tool/bump_version.py --set-pubspec "$FULL_VERSION"
+
       - name: Commit version bump
         id: bump_commit
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && steps.version.outputs.bumped == 'true'
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && needs.build.outputs.bumped == 'true'
         shell: bash
         env:
-          FULL_VERSION: ${{ steps.version.outputs.full }}
+          FULL_VERSION: ${{ needs.build.outputs.full }}
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
@@ -300,8 +367,8 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.version.outputs.tag }}
-          FULL_VERSION: ${{ steps.version.outputs.full }}
+          TAG: ${{ needs.build.outputs.tag }}
+          FULL_VERSION: ${{ needs.build.outputs.full }}
           TARGET: ${{ steps.bump_commit.outputs.sha }}
         run: |
           # Defensive: the version step already picked a free tag, but a
@@ -351,40 +418,3 @@ jobs:
             echo "- Commit: \`$target\`"
             echo "- APKs release por ABI + universal; tamanhos no relatório acima."
           } >> "$GITHUB_STEP_SUMMARY"
-
-  startup-smoke:
-    name: Cold-start smoke (release, Android 35)
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v5
-        with:
-          name: ${{ needs.build.outputs.apk-artifact }}
-          path: apks
-      - name: Enable KVM
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-      - name: Boot and measure the actual release APK
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 35
-          arch: x86_64
-          target: google_apis
-          profile: pixel_2
-          disable-animations: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: python3 tool/startup_smoke.py apks/*-x86_64-release.apk
-      - name: Upload startup evidence
-        if: always()
-        uses: actions/upload-artifact@v5
-        with:
-          name: startup-evidence-${{ github.run_id }}
-          path: build/startup/
-          if-no-files-found: warn
-          retention-days: 30

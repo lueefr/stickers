@@ -70,7 +70,6 @@ class StickersAppState extends State<StickersApp> {
     });
   }
 
-  SharedMedia? media;
   StreamSubscription<SharedMedia>? _shareSubscription;
   Future<void> _shareQueue = Future<void>.value();
 
@@ -102,10 +101,8 @@ class StickersAppState extends State<StickersApp> {
     _shareQueue = _shareQueue.then((_) async {
       if (!mounted) return;
       navigatorKey.currentState!.popUntil((route) => route.isFirst);
-      await _processMedia(shared);
+      final pending = await _processMedia(shared);
       if (!mounted) return;
-      final pending = media;
-      media = null;
       if (pending != null) {
         unawaited(navigatorKey.currentState!.push<void>(
           MaterialPageRoute(builder: (_) => SelectPackPage(pending)),
@@ -215,8 +212,8 @@ class StickersAppState extends State<StickersApp> {
     );
   }
 
-  Future<void> _processMedia(SharedMedia media) async {
-    if (media.attachments == null || media.attachments!.isEmpty || media.attachments!.first == null) return;
+  Future<SharedMedia?> _processMedia(SharedMedia media) async {
+    if (media.attachments == null || media.attachments!.isEmpty || media.attachments!.first == null) return null;
     if (media.attachments!.first!.path.toLowerCase().endsWith(".stickify") ||
         media.attachments!.first!.path.toLowerCase().endsWith(".zip") ||
         media.attachments!.first!.path.toLowerCase().endsWith(".wastickers")) {
@@ -233,7 +230,7 @@ class StickersAppState extends State<StickersApp> {
                   ));
         }
       }
-      return;
+      return null;
     }
     if (media.attachments!.first!.type != SharedAttachmentType.image) {
       if (mounted) {
@@ -244,13 +241,13 @@ class StickersAppState extends State<StickersApp> {
                   title: AppLocalizations.of(context)!.unrecognizedFormat,
                 ));
       }
-      return;
+      return null;
     }
-    this.media = media;
     if (widget.settingsController.quickMode) {
       await _quickAdd(media, widget.settingsController.defaultTitle, widget.settingsController.defaultAuthor);
-      this.media = null;
+      return null;
     }
+    return media;
   }
 
   Future<void> _quickAdd(SharedMedia media, String defaultTitle, String defaultAuthor) async {
