@@ -10,6 +10,7 @@
   "cropYourSticker": "Crop your sticker",
   "done": "Done",
   "stretchToSquare": "Stretch to 1:1",
+  "stickerAlreadyFillsSquare": "This sticker already fills the whole 1:1 square",
   "noTitle": "No title",
   "editYourSticker": "Edit your sticker",
   "addTextLayer": "Add text layer",

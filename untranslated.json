@@ -1,5 +1,6 @@
 {
   "ar": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -19,6 +20,7 @@
     "couldntOpenUpdate"
   ],
   "bg": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -38,6 +40,7 @@
     "couldntOpenUpdate"
   ],
   "bn": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -57,6 +60,7 @@
     "couldntOpenUpdate"
   ],
   "cs": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -76,6 +80,7 @@
     "couldntOpenUpdate"
   ],
   "da": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -95,6 +100,7 @@
     "couldntOpenUpdate"
   ],
   "de": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -114,6 +120,7 @@
     "couldntOpenUpdate"
   ],
   "el": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -133,6 +140,7 @@
     "couldntOpenUpdate"
   ],
   "es": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -152,6 +160,7 @@
     "couldntOpenUpdate"
   ],
   "fa": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -171,6 +180,7 @@
     "couldntOpenUpdate"
   ],
   "fi": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -190,6 +200,7 @@
     "couldntOpenUpdate"
   ],
   "fr": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -209,6 +220,7 @@
     "couldntOpenUpdate"
   ],
   "he": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -228,6 +240,7 @@
     "couldntOpenUpdate"
   ],
   "hi": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -247,6 +260,7 @@
     "couldntOpenUpdate"
   ],
   "hr": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -266,6 +280,7 @@
     "couldntOpenUpdate"
   ],
   "hu": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -285,6 +300,7 @@
     "couldntOpenUpdate"
   ],
   "id": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -304,6 +320,7 @@
     "couldntOpenUpdate"
   ],
   "it": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -323,6 +340,7 @@
     "couldntOpenUpdate"
   ],
   "ja": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -342,6 +360,7 @@
     "couldntOpenUpdate"
   ],
   "ko": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -361,6 +380,7 @@
     "couldntOpenUpdate"
   ],
   "mr": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -380,6 +400,7 @@
     "couldntOpenUpdate"
   ],
   "ms": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -399,6 +420,7 @@
     "couldntOpenUpdate"
   ],
   "nb": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -418,6 +440,7 @@
     "couldntOpenUpdate"
   ],
   "nl": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -437,6 +460,7 @@
     "couldntOpenUpdate"
   ],
   "pl": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -456,6 +480,7 @@
     "couldntOpenUpdate"
   ],
   "ro": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -475,6 +500,7 @@
     "couldntOpenUpdate"
   ],
   "ru": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -494,6 +520,7 @@
     "couldntOpenUpdate"
   ],
   "sk": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -513,6 +540,7 @@
     "couldntOpenUpdate"
   ],
   "sr": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -532,6 +560,7 @@
     "couldntOpenUpdate"
   ],
   "sv": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -551,6 +580,7 @@
     "couldntOpenUpdate"
   ],
   "ta": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -570,6 +600,7 @@
     "couldntOpenUpdate"
   ],
   "te": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -589,6 +620,7 @@
     "couldntOpenUpdate"
   ],
   "th": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -608,6 +640,7 @@
     "couldntOpenUpdate"
   ],
   "tl": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -627,6 +660,7 @@
     "couldntOpenUpdate"
   ],
   "tr": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -646,6 +680,7 @@
     "couldntOpenUpdate"
   ],
   "uk": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -665,6 +700,7 @@
     "couldntOpenUpdate"
   ],
   "ur": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -684,6 +720,7 @@
     "couldntOpenUpdate"
   ],
   "vi": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
@@ -703,6 +740,7 @@
     "couldntOpenUpdate"
   ],
   "zh": [
+    "stickerAlreadyFillsSquare",
     "replaceSticker",
     "animatedStickerCropUnavailable",
     "couldntExportPacks",
