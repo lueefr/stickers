@@ -17,6 +17,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 class MainActivity : FlutterActivity() {
@@ -62,15 +63,28 @@ class MainActivity : FlutterActivity() {
                         result.error("INVALID_ARGUMENTS", "Arguments must be a map", null)
                         return@setMethodCallHandler
                     }
-                    try {
-                        val inputFile = File(args["inputFile"]!! as String)
-                        val outputFile = File(args["outputFile"]!! as String)
-                        val fps = args["fps"]!! as Int
-                        val config = WebPConfig.fromMap(args["config"]!! as Map<*, *>)
-                        gifToWebP.convert(inputFile, outputFile, config, fps)
-                        result.success(null)
-                    } catch (e: Exception) {
-                        result.error("GIF_CONVERT_FAILED", e.message, null)
+                    // Decoding the GIF frame by frame and encoding every frame is
+                    // CPU bound work that takes seconds, so it runs off the
+                    // platform thread: this handler runs on it, and blocking it
+                    // would freeze the UI (and the progress dialog the caller
+                    // shows) for the whole conversion. Same pattern as
+                    // CropAndScale and OverlayAndEncode, which launch on
+                    // Dispatchers.Default internally.
+                    scope.launch(Dispatchers.Default) {
+                        try {
+                            val inputFile = File(args["inputFile"]!! as String)
+                            val outputFile = File(args["outputFile"]!! as String)
+                            val fps = args["fps"]!! as Int
+                            val config = WebPConfig.fromMap(args["config"]!! as Map<*, *>)
+                            gifToWebP.convert(inputFile, outputFile, config, fps)
+                            // The method channel result has to be delivered on the
+                            // platform thread.
+                            withContext(Dispatchers.Main) { result.success(null) }
+                        } catch (e: Exception) {
+                            withContext(Dispatchers.Main) {
+                                result.error("GIF_CONVERT_FAILED", e.message, null)
+                            }
+                        }
                     }
                 }
 

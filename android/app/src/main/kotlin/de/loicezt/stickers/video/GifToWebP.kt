@@ -30,34 +30,43 @@ class GifToWebP {
         val dy = (OUTPUT_DIMENSION - height * scale) / 2f
 
         val bitmap = Bitmap.createBitmap(OUTPUT_DIMENSION, OUTPUT_DIMENSION, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        val buffer = ByteBuffer.allocateDirect(OUTPUT_DIMENSION * OUTPUT_DIMENSION * 4)
-        val encoder = LibWebP()
+        try {
+            val canvas = Canvas(bitmap)
+            val buffer = ByteBuffer.allocateDirect(OUTPUT_DIMENSION * OUTPUT_DIMENSION * 4)
+            val encoder = LibWebP()
 
-        if (!encoder.nativeInitEncoder(OUTPUT_DIMENSION, OUTPUT_DIMENSION, config)) {
-            throw IllegalStateException("Could not initialize WebP encoder")
+            if (!encoder.nativeInitEncoder(OUTPUT_DIMENSION, OUTPUT_DIMENSION, config)) {
+                throw IllegalStateException("Could not initialize WebP encoder")
+            }
+
+            var timestampMs = 0
+            while (timestampMs < duration) {
+                bitmap.eraseColor(Color.TRANSPARENT)
+                canvas.save()
+                canvas.translate(dx, dy)
+                canvas.scale(scale, scale)
+                movie.setTime(timestampMs)
+                movie.draw(canvas, 0f, 0f)
+                canvas.restore()
+
+                buffer.rewind()
+                bitmap.copyPixelsToBuffer(buffer)
+                buffer.rewind()
+                encoder.nativeAddFrame(buffer, timestampMs)
+                timestampMs += frameIntervalMs
+            }
+
+            val data = encoder.nativeReleaseEncoder()
+                ?: throw IllegalStateException("Could not assemble animated WebP")
+            outputFile.writeBytes(data)
+        } finally {
+            bitmap.recycle()
+            // The native encoder keeps its state in a single static pointer, so a
+            // failure that leaves it behind would make every later encode (of a
+            // GIF or of a video) fail until the process restarts. Releasing it is
+            // safe even when it was never initialized: the native side guards
+            // against a null state.
+            LibWebP().nativeReleaseEncoder()
         }
-
-        var timestampMs = 0
-        while (timestampMs < duration) {
-            bitmap.eraseColor(Color.TRANSPARENT)
-            canvas.save()
-            canvas.translate(dx, dy)
-            canvas.scale(scale, scale)
-            movie.setTime(timestampMs)
-            movie.draw(canvas, 0f, 0f)
-            canvas.restore()
-
-            buffer.rewind()
-            bitmap.copyPixelsToBuffer(buffer)
-            buffer.rewind()
-            encoder.nativeAddFrame(buffer, timestampMs)
-            timestampMs += frameIntervalMs
-        }
-
-        val data = encoder.nativeReleaseEncoder()
-            ?: throw IllegalStateException("Could not assemble animated WebP")
-        outputFile.writeBytes(data)
-        bitmap.recycle()
     }
 }
