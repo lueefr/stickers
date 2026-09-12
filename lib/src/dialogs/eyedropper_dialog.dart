@@ -347,15 +347,25 @@ class GradientSliderTrackShape extends SliderTrackShape with BaseSliderTrackShap
 
   /// Loads (and caches) the fragment programs. Await this and rebuild once to
   /// make the first painted frame already show the gradients.
-  static Future<void> prime() async {
+  static Future<void>? _priming;
+
+  static Future<void> prime() => _priming ??= _loadPrograms();
+
+  static Future<void> _loadPrograms() async {
     try {
-      _hueGradientProgram ??= await FragmentProgram.fromAsset('assets/shaders/hue_gradient.frag');
-      _saturationGradientProgram ??=
-          await FragmentProgram.fromAsset('assets/shaders/saturation_gradient.frag');
-      _lightnessGradientProgram ??=
-          await FragmentProgram.fromAsset('assets/shaders/lightness_gradient.frag');
+      await Future.wait<void>([
+        if (_hueGradientProgram == null)
+          FragmentProgram.fromAsset('assets/shaders/hue_gradient.frag')
+              .then((program) { _hueGradientProgram = program; }),
+        if (_saturationGradientProgram == null)
+          FragmentProgram.fromAsset('assets/shaders/saturation_gradient.frag')
+              .then((program) { _saturationGradientProgram = program; }),
+        if (_lightnessGradientProgram == null)
+          FragmentProgram.fromAsset('assets/shaders/lightness_gradient.frag')
+              .then((program) { _lightnessGradientProgram = program; }),
+      ]);
     } catch (_) {
-      // The track paints a neutral fallback color until the programs load.
+      _priming = null; // Keep the neutral fallback and allow a later retry.
     }
   }
 

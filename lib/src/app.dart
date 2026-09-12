@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -8,6 +9,9 @@ import 'package:stickers/src/data/load_store.dart';
 import 'package:stickers/src/data/sticker_pack.dart';
 import 'package:stickers/src/dialogs/error_dialog.dart';
 import 'package:stickers/src/globals.dart';
+import 'package:stickers/src/fonts_api/fonts_registry.dart';
+import 'package:stickers/src/dialogs/eyedropper_dialog.dart';
+import 'package:stickers/src/widgets/initialization_gate.dart';
 import 'package:stickers/src/pages/crop_page.dart';
 import 'package:stickers/src/pages/edit_page.dart';
 import 'package:stickers/src/pages/fonts_manager_page.dart';
@@ -47,8 +51,9 @@ class StickersAppState extends State<StickersApp> {
   void initState() {
     super.initState();
     _locale = parseLocaleSetting(widget.settingsController.locale);
-    initPlatformState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(initPlatformState());
       final updateContext = navigatorKey.currentContext;
       if (mounted && updateContext != null) {
         checkForAppUpdate(updateContext);
@@ -65,30 +70,47 @@ class StickersAppState extends State<StickersApp> {
     });
   }
 
-  SharedMedia? media;
+  StreamSubscription<SharedMedia>? _shareSubscription;
+  Future<void> _shareQueue = Future<void>.value();
+
+  @override
+  void dispose() {
+    _shareSubscription?.cancel();
+    super.dispose();
+  }
+
+  static Future<void> _prepareEditor() async {
+    await Future.wait<void>([FontsRegistry.init(), GradientSliderTrackShape.prime()]);
+  }
 
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> initPlatformState() async {
     final handler = ShareHandlerPlatform.instance;
-    media = await handler.getInitialSharedMedia();
-    if (media != null) {
-      debugPrint("Initial Media received");
-      await _processMedia(media!);
-      setState(() {});
-      homeState?.setState(() {});
-    }
-    handler.sharedMediaStream.listen((SharedMedia media) async {
-      navigatorKey.currentState!.pushNamedAndRemoveUntil('/', (Route<dynamic> route) => false);
+    try {
+      final initial = await handler.getInitialSharedMedia();
       if (!mounted) return;
-      debugPrint("Media Stream received");
-      await _processMedia(media);
-      setState(() {});
-      homeState?.setState(() {});
-    });
-    if (!mounted) return;
+      if (initial != null) _enqueueMedia(initial);
+      _shareSubscription = handler.sharedMediaStream.listen(_enqueueMedia);
+    } catch (error, stack) {
+      FlutterError.reportError(FlutterErrorDetails(exception: error, stack: stack));
+    }
+  }
 
-    setState(() {
-      // _platformVersion = platformVersion;
+  void _enqueueMedia(SharedMedia shared) {
+    // A second share must not race an import/quick-add already saving packs.
+    _shareQueue = _shareQueue.then((_) async {
+      if (!mounted) return;
+      navigatorKey.currentState!.popUntil((route) => route.isFirst);
+      final pending = await _processMedia(shared);
+      if (!mounted) return;
+      if (pending != null) {
+        unawaited(navigatorKey.currentState!.push<void>(
+          MaterialPageRoute(builder: (_) => SelectPackPage(pending)),
+        ));
+      }
+      homeState?.update();
+    }).catchError((Object error, StackTrace stack) {
+      FlutterError.reportError(FlutterErrorDetails(exception: error, stack: stack));
     });
   }
 
@@ -146,14 +168,12 @@ class StickersAppState extends State<StickersApp> {
             return MaterialPageRoute<void>(
               settings: routeSettings,
               builder: (BuildContext context) {
-                if (media != null) {
-                  final page = SelectPackPage(media!);
-                  media = null;
-                  return page;
-                }
                 switch (routeSettings.name) {
                   case FontsManagerPage.routeName:
-                    return FontsManagerPage();
+                    return InitializationGate(
+                      initialize: FontsRegistry.init,
+                      builder: (_) => const FontsManagerPage(),
+                    );
                   case SettingsPage.routeName:
                     return SettingsPage(controller: widget.settingsController);
                   case VideoCropPage.routeName:
@@ -172,7 +192,10 @@ class StickersAppState extends State<StickersApp> {
                     );
                   case EditPage.routeName:
                     final args = routeSettings.arguments as EditArguments;
-                    return EditPage(args.pack, args.index, args.mediaPath, args.type, popCount: args.popCount);
+                    return InitializationGate(
+                      initialize: _prepareEditor,
+                      builder: (_) => EditPage(args.pack, args.index, args.mediaPath, args.type, popCount: args.popCount),
+                    );
                   case StickerPackPage.routeName:
                     return StickerPackPage(routeSettings.arguments as StickerPack, () {
                       setState(() {});
@@ -189,7 +212,8 @@ class StickersAppState extends State<StickersApp> {
     );
   }
 
-  Future<void> _processMedia(SharedMedia media) async {
+  Future<SharedMedia?> _processMedia(SharedMedia media) async {
+    if (media.attachments == null || media.attachments!.isEmpty || media.attachments!.first == null) return null;
     if (media.attachments!.first!.path.toLowerCase().endsWith(".stickify") ||
         media.attachments!.first!.path.toLowerCase().endsWith(".zip") ||
         media.attachments!.first!.path.toLowerCase().endsWith(".wastickers")) {
@@ -206,7 +230,7 @@ class StickersAppState extends State<StickersApp> {
                   ));
         }
       }
-      return;
+      return null;
     }
     if (media.attachments!.first!.type != SharedAttachmentType.image) {
       if (mounted) {
@@ -217,13 +241,13 @@ class StickersAppState extends State<StickersApp> {
                   title: AppLocalizations.of(context)!.unrecognizedFormat,
                 ));
       }
-      return;
+      return null;
     }
-    this.media = media;
     if (widget.settingsController.quickMode) {
-      _quickAdd(media, widget.settingsController.defaultTitle, widget.settingsController.defaultAuthor);
-      this.media = null;
+      await _quickAdd(media, widget.settingsController.defaultTitle, widget.settingsController.defaultAuthor);
+      return null;
     }
+    return media;
   }
 
   Future<void> _quickAdd(SharedMedia media, String defaultTitle, String defaultAuthor) async {

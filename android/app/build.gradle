@@ -92,8 +92,15 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             if (keystorePropertiesFile.exists()) {
                 signingConfig signingConfigs.release
+            } else if (providers.gradleProperty("communitySigning").orNull == "true") {
+                // Explicit opt-in for GitHub community builds only. Retains
+                // update compatibility with the already distributed debug APK.
+                signingConfig signingConfigs.debug
             } else {
                 logger.warn("android/key.properties not found: building an unsigned release APK. " +
                     "Add a keystore to sign release builds for publishing.")

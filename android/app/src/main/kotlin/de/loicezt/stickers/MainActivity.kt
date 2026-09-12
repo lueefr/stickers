@@ -1,6 +1,8 @@
 package de.loicezt.stickers
 
 import android.os.Build
+import android.os.SystemClock
+import android.util.Log
 import androidx.annotation.NonNull
 import androidx.annotation.RequiresApi
 import de.loicezt.stickers.video.CropAndScale
@@ -25,9 +27,27 @@ class MainActivity : FlutterActivity() {
     private val TRIM_CHANNEL_NAME = "de.loicezt.stickers/progress_trim"
     private val ECODE_CHANNEL_NAME = "de.loicezt.stickers/progress_encode"
 
-    private lateinit var cropAndScale: CropAndScale
-    private lateinit var overlayAndEncode: OverlayAndEncode
-    private lateinit var gifToWebP: GifToWebP
+    private val createdAt = SystemClock.elapsedRealtime()
+    private var homeReady = false
+    private var flutterDisplayed = false
+    private var startupReported = false
+
+    override fun onFlutterUiDisplayed() {
+        super.onFlutterUiDisplayed()
+        flutterDisplayed = true
+        reportStartupIfReady()
+    }
+
+    private fun reportStartupIfReady() {
+        if (!homeReady || !flutterDisplayed || startupReported) return
+        startupReported = true
+        Log.i("StickersStartup", "home_ready_ms=${SystemClock.elapsedRealtime() - createdAt}")
+        reportFullyDrawn()
+    }
+    private val cropAndScaleDelegate = lazy { CropAndScale() }
+    private val cropAndScale by cropAndScaleDelegate
+    private val overlayAndEncode by lazy { OverlayAndEncode() }
+    private val gifToWebP by lazy { GifToWebP() }
     private val scope = CoroutineScope(
         Dispatchers.Main + SupervisorJob()
     )
@@ -35,16 +55,20 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        cropAndScale = CropAndScale()
-        overlayAndEncode = OverlayAndEncode()
-        gifToWebP = GifToWebP()
-
         // 1. Setup the MethodChannel to receive commands from Flutter
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             METHOD_CHANNEL_NAME
         ).setMethodCallHandler { call, result ->
             when (call.method) {
+                "supportedAbis" -> result.success(Build.SUPPORTED_ABIS.toList())
+                "reportReady" -> {
+                    // Sent after the first real home frame, with settings and
+                    // packs loaded. Visible in release logcat for CI/device runs.
+                    homeReady = true
+                    reportStartupIfReady()
+                    result.success(null)
+                }
                 "startTrim" -> {
                     val args = call.arguments as Map<String, String>
                     val inputFile = File(args["inputFile"]!!)
@@ -196,7 +220,7 @@ class MainActivity : FlutterActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        cropAndScale.release()
+        if (cropAndScaleDelegate.isInitialized()) cropAndScale.release()
         scope.cancel()
     }
 }

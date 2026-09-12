@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_archive/flutter_archive.dart';
@@ -153,10 +154,19 @@ Future<void> importPack(File f) async {
 Future<List<StickerPack>> getPacks() async {
   File input = File("$packsDir/packs.json");
   if (await input.exists()) {
-    return (jsonDecode(await input.readAsString()) as List).map((json) => StickerPack.fromJson(json)).toList();
+    final source = await input.readAsString();
+    // Small libraries are cheaper inline; large ones must not monopolize the
+    // UI isolate while decoding JSON and allocating thousands of stickers.
+    return source.length < 64 * 1024
+        ? decodePacks(source)
+        : compute(decodePacks, source, debugLabel: 'decode sticker library');
   }
   return List.empty(growable: true);
 }
+
+@visibleForTesting
+List<StickerPack> decodePacks(String source) =>
+    (jsonDecode(source) as List).map((json) => StickerPack.fromJson(json)).toList();
 
 Future<Uint8List> cropSticker(
     Rect cropRect, Uint8List rawImageData, StickerPack pack, int index, double rotation) async {

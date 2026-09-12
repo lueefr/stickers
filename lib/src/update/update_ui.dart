@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:stickers/generated/intl/app_localizations.dart';
@@ -46,7 +47,16 @@ Future<void> checkForAppUpdate(
   try {
     final packageInfo = info ?? await PackageInfo.fromPlatform();
     info ??= packageInfo;
-    final release = await const UpdateService().findAvailableUpdate(
+    List<String> abis = const [];
+    try {
+      abis = await const MethodChannel('de.loicezt.stickers/methods')
+          .invokeListMethod<String>('supportedAbis') ?? const [];
+    } on PlatformException catch (_) {
+      // Universal APK remains a safe fallback when ABI discovery fails.
+    } on MissingPluginException catch (_) {
+      // Non-Android test/development hosts.
+    }
+    final release = await UpdateService(supportedAbis: abis).findAvailableUpdate(
       currentVersion: packageInfo.version,
       currentBuildNumber: packageInfo.buildNumber,
     );
