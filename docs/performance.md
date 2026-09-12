@@ -71,6 +71,16 @@ Arquivo: `.github/workflows/debug-apk-release.yml` (nome histórico do arquivo).
    release, atualizando por cima da instalação existente (testa a assinatura).
    Mantém animações ligadas e captura am start, logcat e screenshots. Abre
    Settings → Fonts manager e exige que Lobster apareça após registro nativo.
+   O baseline debug (JIT, APK universal de ~171 MiB) paga dexopt/warm-up na
+   primeira abertura e, num emulador de CI carregado, o `am start -W` pode
+   estourar a janela do ActivityManager (~10 s) e responder `Status: timeout` /
+   `LaunchState: UNKNOWN`. Por isso o baseline faz **uma abertura de warm-up
+   descartada** e cada abertura tem **retry** (nunca em crash real, só em
+   timeout). Se ainda assim não for mensurável, o smoke **emite um warning e
+   segue**: o release continua sendo instalado por cima, medido e publicado —
+   um baseline histórico e comparativo não pode bloquear o `publish` do APK
+   novo. Cada retry fica registrado em `baseline-*-failures.txt` e no JSON
+   (`warmup_launch_attempts`, `launch_attempts`, `timed_out_launches`).
 5. Publicação/version bump **somente em main, após build e smoke passarem**.
    Push nesta branch apenas valida e disponibiliza artifacts; não cria release.
 
@@ -91,6 +101,14 @@ O primeiro lançamento inclui inicialização de instalação/atualização; as 
 seguintes têm processo frio, mas caches de disco/sistema quentes. CI usa emulador,
 não celular. Não há limite arbitrário de 100 ms nem garantia de “instantâneo”.
 Uma home vazia também não representa uma biblioteca com milhares de stickers.
+
+Retry e warm-up não fabricam número: uma abertura só entra na mediana quando o
+`am start -W` responde `Status: ok` com `TotalTime`. Timeout de framework é
+tratado como tentativa falha (repetida), nunca como tempo. O warm-up do baseline
+é descartado justamente para não misturar o custo único de dexopt/JIT com as
+aberturas medidas; a comparação usa a mediana das reinicializações, não o
+warm-up. Quando o baseline precisa de retry, isso é declarado na anotação de
+comparação — a variabilidade do emulador fica visível em vez de ser escondida.
 
 Para medir no celular conectado (ADB habilitado):
 
