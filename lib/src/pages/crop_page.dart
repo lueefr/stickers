@@ -33,7 +33,7 @@ class CropPage extends StatefulWidget {
 
 class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
   late final AnimationController _maskColorController;
-  late final Animation<double> _maskColorAnimation;
+  late final CurvedAnimation _maskColorAnimation;
   final ImageEditorController _editorController = ImageEditorController();
 
   bool _previousPtrVal = false;
