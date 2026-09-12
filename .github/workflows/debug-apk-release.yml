@@ -150,6 +150,25 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Surface analyzer diagnostics
+        if: steps.analyze.outcome == 'failure'
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          # The runner log is also uploaded above. Echo the first diagnostics
+          # as annotations so they remain inspectable when a log download is
+          # unavailable from a restricted network.
+          for number, line in enumerate(Path('analyze.log').read_text().splitlines(), 1):
+              if not line.strip():
+                  continue
+              message = line.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+              print(f'::error file=analyze.log,line={number}::{message}')
+              if number >= 100:
+                  break
+          PY
+
       - name: Fail on analyzer errors
         if: steps.analyze.outcome == 'failure'
         run: exit 1
