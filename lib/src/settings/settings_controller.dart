@@ -77,12 +77,23 @@ class SettingsController with ChangeNotifier {
   /// local database or the internet. The controller only knows it can load the
   /// settings from the service.
   Future<void> loadSettings() async {
-    _themeMode = await _settingsService.themeMode();
-    _quickMode = await _settingsService.quickMode();
-    _defaultTitle = await _settingsService.defaultTitle();
-    _defaultAuthor = await _settingsService.defaultAuthor();
-    _locale = await _settingsService.locale();
-    _googleFonts = await _settingsService.googleFonts();
+    // SharedPreferences reads are independent. Starting them together avoids
+    // turning startup into six sequential async hops before MaterialApp can
+    // render its first frame.
+    final values = await Future.wait<Object?>([
+      _settingsService.themeMode(),
+      _settingsService.quickMode(),
+      _settingsService.defaultTitle(),
+      _settingsService.defaultAuthor(),
+      _settingsService.locale(),
+      _settingsService.googleFonts(),
+    ]);
+    _themeMode = values[0] as ThemeMode;
+    _quickMode = values[1] as bool;
+    _defaultTitle = values[2] as String;
+    _defaultAuthor = values[3] as String;
+    _locale = values[4] as String;
+    _googleFonts = values[5] as bool;
 
     notifyListeners();
   }

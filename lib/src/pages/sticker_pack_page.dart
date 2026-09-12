@@ -6,7 +6,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:stickers/generated/intl/app_localizations.dart';
-import 'package:stickers/src/checker_painter.dart';
 import 'package:stickers/src/constants.dart';
 import 'package:stickers/src/data/load_store.dart';
 import 'package:stickers/src/data/sticker_pack.dart';
@@ -20,6 +19,7 @@ import 'package:stickers/src/pages/crop_page.dart';
 import 'package:stickers/src/pages/default_page.dart';
 import 'package:stickers/src/video/gif_to_webp.dart';
 import 'package:stickers/src/util.dart';
+import 'package:stickers/src/widgets/sticker_thumbnail.dart';
 
 class StickerPackPage extends StatefulWidget {
   final StickerPack pack;
@@ -122,52 +122,43 @@ class StickerPackPageState extends State<StickerPackPage> {
                         clipBehavior: Clip.antiAlias,
                         child: index >= widget.pack.stickers.length
                             ? null
-                            : CustomPaint(
-                                painter: CheckerPainter(context),
-                                child: GestureDetector(
-                                  child: Image.file(
-                                    File(widget.pack.stickers[index].source),
-                                    width: double.infinity,
-                                    height: double.infinity,
-                                    cacheWidth: 256,
-                                    cacheHeight: 256,
-                                    gaplessPlayback: true,
-                                    fit: BoxFit.contain,
-                                  ),
-                                  onTap: () {
-                                    EditStickerDialog.show(context, widget.pack, index).then(
-                                      (action) {
-                                        // The sheet can rebuild (or drop) this grid cell
-                                        // while it is open, so navigate from the page's own
-                                        // context instead of the cell one.
-                                        if (!mounted) return;
-                                        switch (action) {
-                                          case StickerSheetAction.edit:
-                                            // Go through the crop screen first; the final save
-                                            // (addToPack) replaces the sticker at `index`
-                                            // in-place, overwriting the edited sticker.
-                                            Navigator.of(this.context)
-                                                .pushNamed(
-                                                  "/crop",
-                                                  arguments: EditArguments(
-                                                    pack: widget.pack,
-                                                    index: index,
-                                                    mediaPath: widget.pack.stickers[index].source,
-                                                  ),
-                                                )
-                                                .then((_) => setState(() {}));
-                                          case StickerSheetAction.replace:
-                                            // New media in the very same slot: the position
-                                            // and the emojis of the sticker are kept.
-                                            _replaceSticker(index);
-                                          case null:
-                                            // Dismissed, emojis saved or sticker deleted.
-                                            setState(() {});
-                                        }
-                                      },
-                                    );
-                                  },
-                                ),
+                            : StickerThumbnail(
+                                widget.pack.stickers[index].source,
+                                cacheWidth: 256,
+                                cacheHeight: 256,
+                                onTap: () {
+                                  EditStickerDialog.show(context, widget.pack, index).then(
+                                    (action) {
+                                      // The sheet can rebuild (or drop) this grid cell
+                                      // while it is open, so navigate from the page's own
+                                      // context instead of the cell one.
+                                      if (!mounted) return;
+                                      switch (action) {
+                                        case StickerSheetAction.edit:
+                                          // Go through the crop screen first; the final save
+                                          // (addToPack) replaces the sticker at `index`
+                                          // in-place, overwriting the edited sticker.
+                                          Navigator.of(this.context)
+                                              .pushNamed(
+                                                "/crop",
+                                                arguments: EditArguments(
+                                                  pack: widget.pack,
+                                                  index: index,
+                                                  mediaPath: widget.pack.stickers[index].source,
+                                                ),
+                                              )
+                                              .then((_) => setState(() {}));
+                                        case StickerSheetAction.replace:
+                                          // New media in the very same slot: the position
+                                          // and the emojis of the sticker are kept.
+                                          _replaceSticker(index);
+                                        case null:
+                                          // Dismissed, emojis saved or sticker deleted.
+                                          setState(() {});
+                                      }
+                                    },
+                                  );
+                                },
                               ),
                       );
                     }),

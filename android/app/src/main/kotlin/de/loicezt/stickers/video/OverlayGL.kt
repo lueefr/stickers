@@ -29,6 +29,18 @@ class OverlayGL : SurfaceTexture.OnFrameAvailableListener {
     private var videoProgramHandle = 0
     private var overlayProgramHandle = 0
 
+    // Shader locations are immutable after linking. Looking them up for every
+    // encoded frame crosses the GLES driver boundary repeatedly and is
+    // surprisingly expensive on mid-range phones.
+    private var videoPositionHandle = -1
+    private var videoTexCoordHandle = -1
+    private var videoTransformHandle = -1
+    private var videoSamplerHandle = -1
+    private var overlayPositionHandle = -1
+    private var overlayTexCoordHandle = -1
+    private var overlaySamplerHandle = -1
+    private var overlayTextureUploaded = false
+
     private var videoTextureHandle = 0
     private var overlayTextureHandle = 0
     private var fboHandle = 0
@@ -91,6 +103,7 @@ class OverlayGL : SurfaceTexture.OnFrameAvailableListener {
 
         videoProgramHandle = createProgram(VIDEO_VERTEX_SHADER, VIDEO_FRAGMENT_SHADER)
         overlayProgramHandle = createProgram(OVERLAY_VERTEX_SHADER, OVERLAY_FRAGMENT_SHADER)
+        cacheShaderLocations()
         videoTextureHandle = createExternalOESTexture()
         overlayTextureHandle = create2DTexture()
         setupFBO()
@@ -167,14 +180,30 @@ class OverlayGL : SurfaceTexture.OnFrameAvailableListener {
         eglSurface = EGL14.EGL_NO_SURFACE
     }
 
+    private fun cacheShaderLocations() {
+        videoTransformHandle = GLES20.glGetUniformLocation(videoProgramHandle, "uTransformMatrix")
+        videoSamplerHandle = GLES20.glGetUniformLocation(videoProgramHandle, "sTexture")
+        videoPositionHandle = GLES20.glGetAttribLocation(videoProgramHandle, "aPosition")
+        videoTexCoordHandle = GLES20.glGetAttribLocation(videoProgramHandle, "aTexCoord")
+
+        overlaySamplerHandle = GLES20.glGetUniformLocation(overlayProgramHandle, "sTexture")
+        overlayPositionHandle = GLES20.glGetAttribLocation(overlayProgramHandle, "aPosition")
+        overlayTexCoordHandle = GLES20.glGetAttribLocation(overlayProgramHandle, "aTexCoord")
+
+        // Sampler uniforms are constant for the lifetime of the GL context.
+        GLES20.glUseProgram(videoProgramHandle)
+        GLES20.glUniform1i(videoSamplerHandle, 0)
+        GLES20.glUseProgram(overlayProgramHandle)
+        GLES20.glUniform1i(overlaySamplerHandle, 1)
+        GLES20.glUseProgram(0)
+    }
+
     private fun drawVideo() {
         GLES20.glUseProgram(videoProgramHandle)
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, videoTextureHandle)
-        val uTransformMatrixHandle = GLES20.glGetUniformLocation(videoProgramHandle, "uTransformMatrix")
-        GLES20.glUniformMatrix4fv(uTransformMatrixHandle, 1, false, finalMatrix, 0)
-        renderQuad(GLES20.glGetAttribLocation(videoProgramHandle, "aPosition"),
-            GLES20.glGetAttribLocation(videoProgramHandle, "aTexCoord"), texCoordBuffer)
+        GLES20.glUniformMatrix4fv(videoTransformHandle, 1, false, finalMatrix, 0)
+        renderQuad(videoPositionHandle, videoTexCoordHandle, texCoordBuffer)
     }
 
     private fun drawOverlay(bitmap: Bitmap) {
@@ -184,13 +213,15 @@ class OverlayGL : SurfaceTexture.OnFrameAvailableListener {
 
         GLES20.glActiveTexture(GLES20.GL_TEXTURE1)
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, overlayTextureHandle)
-        GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0)
+        // The overlay is static for the entire encode. Uploading the same
+        // 512x512 bitmap for every video frame needlessly saturates the GL
+        // driver and memory bus; upload it exactly once.
+        if (!overlayTextureUploaded) {
+            GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0)
+            overlayTextureUploaded = true
+        }
 
-        val uTextureHandle = GLES20.glGetUniformLocation(overlayProgramHandle, "sTexture")
-        GLES20.glUniform1i(uTextureHandle, 1)
-
-        renderQuad(GLES20.glGetAttribLocation(overlayProgramHandle, "aPosition"),
-            GLES20.glGetAttribLocation(overlayProgramHandle, "aTexCoord"), texCoordBuffer)
+        renderQuad(overlayPositionHandle, overlayTexCoordHandle, texCoordBuffer)
 
         GLES20.glDisable(GLES20.GL_BLEND)
     }

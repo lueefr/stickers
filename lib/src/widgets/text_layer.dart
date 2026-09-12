@@ -50,26 +50,40 @@ class TextLayer extends StatefulWidget implements EditorLayer {
   }
 }
 
-class TextLayerState extends State<TextLayer> with TickerProviderStateMixin {
+class TextLayerState extends State<TextLayer> {
   final TextEditingController _controller = TextEditingController(text: "");
   final _focusNode = FocusNode();
   final _editorKey = GlobalKey();
+  late final ValueNotifier<Matrix4> _transform;
 
   @override
   void initState() {
     super.initState();
     _controller.text = widget.text.text;
-    WidgetsBinding.instance.addPostFrameCallback((_) => enableEditing());
+    _transform = ValueNotifier<Matrix4>(widget.text.transform);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) enableEditing();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant TextLayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.data.text, widget.data.text)) {
+      _transform.value = widget.text.transform;
+    }
   }
 
   @override
   void dispose() {
+    _transform.dispose();
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
   void enableEditing() {
+    if (!mounted) return;
     showDialog(
       useRootNavigator: true,
       context: context,
@@ -88,11 +102,14 @@ class TextLayerState extends State<TextLayer> with TickerProviderStateMixin {
           },
         ),
       ),
-    ).then(
-      (value) => setState(() {
+    ).then((value) {
+      // Deleting the layer disposes this state while the dialog is closing.
+      // Do not schedule a rebuild on a disposed state.
+      if (!mounted) return;
+      setState(() {
         widget.text.text = _controller.text;
-      }),
-    );
+      });
+    });
   }
 
   @override
@@ -141,10 +158,10 @@ class TextLayerState extends State<TextLayer> with TickerProviderStateMixin {
 
     // Sticker text must render identically regardless of the system font
     // scaling, otherwise the design changes per device accessibility setting.
-    return MediaQuery.withNoTextScaling(
-      child: Transform(
-        origin: const Offset(0, 0),
-        transform: widget.text.transform,
+    // The repaint boundary is inside the transform so dragging a layer can
+    // reuse its rasterized text and only update the compositor matrix.
+    final content = RepaintBoundary(
+      child: MediaQuery.withNoTextScaling(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -157,6 +174,16 @@ class TextLayerState extends State<TextLayer> with TickerProviderStateMixin {
         ),
       ),
     );
+
+    return ValueListenableBuilder<Matrix4>(
+      valueListenable: _transform,
+      child: content,
+      builder: (context, transform, child) => Transform(
+        origin: const Offset(0, 0),
+        transform: transform,
+        child: child,
+      ),
+    );
   }
 
   void update(Matrix4 matrix) {
@@ -164,7 +191,7 @@ class TextLayerState extends State<TextLayer> with TickerProviderStateMixin {
     // mounted (or is already disposed), and such a state cannot rebuild.
     if (!mounted) return;
     widget.text.transform = matrix;
-    setState(() {});
+    _transform.value = matrix;
   }
 
   void disableEditing() {
