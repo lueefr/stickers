@@ -99,6 +99,43 @@ void main() {
       expect(release.updateUrl, Uri.parse('https://example.com/release'));
     });
 
+    Map<String, dynamic> assets(List<String> names) => {
+      'tag_name': 'v2.0.0+28',
+      'html_url': 'https://example.com/release',
+      'assets': names.map((name) => {
+        'name': 'stickers-$name.apk',
+        'browser_download_url': 'https://example.com/$name.apk',
+      }).toList(),
+    };
+
+    test('prefers the device ABI release over universal and debug', () {
+      final release = UpdateRelease.fromJson(assets([
+        'universal-release', 'debug', 'armeabi-v7a-release', 'arm64-v8a-release', 'x86_64-release',
+      ]), supportedAbis: ['arm64-v8a', 'armeabi-v7a']);
+      expect(release.updateUrl.path, '/arm64-v8a-release.apk');
+    });
+
+    test('x86_64 is not confused with x86 or ARM', () {
+      final release = UpdateRelease.fromJson(assets([
+        'arm64-v8a-release', 'x86_64-release', 'universal-release',
+      ]), supportedAbis: ['x86_64', 'x86']);
+      expect(release.updateUrl.path, '/x86_64-release.apk');
+    });
+
+    test('unknown ABI falls back to universal release, not a random split', () {
+      final release = UpdateRelease.fromJson(assets([
+        'arm64-v8a-release', 'debug', 'universal-release',
+      ]));
+      expect(release.updateUrl.path, '/universal-release.apk');
+    });
+
+    test('an incompatible-only release opens its release page', () {
+      final release = UpdateRelease.fromJson(assets(['arm64-v8a-release']),
+          supportedAbis: ['armeabi-v7a']);
+      expect(release.apkDownloadUrl, isNull);
+      expect(release.updateUrl.path, '/release');
+    });
+
     test('rejects malformed release metadata', () {
       expect(
         () => UpdateRelease.fromJson({'tag_name': 'v1.0.0'}),

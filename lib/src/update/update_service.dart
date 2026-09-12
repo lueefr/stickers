@@ -14,7 +14,7 @@ class UpdateRelease {
     this.apkDownloadUrl,
   });
 
-  factory UpdateRelease.fromJson(Map<String, dynamic> json) {
+  factory UpdateRelease.fromJson(Map<String, dynamic> json, {List<String> supportedAbis = const []}) {
     final tagName = json['tag_name'];
     final htmlUrl = json['html_url'];
     if (tagName is! String || tagName.isEmpty || htmlUrl is! String) {
@@ -33,16 +33,24 @@ class UpdateRelease {
           continue;
         }
 
-        // Prefer the combined APK produced by our workflow over architecture-specific APKs.
         final lowerName = name.toLowerCase();
-        var score = 0;
-        if (lowerName.contains('universal') || lowerName.contains('debug')) score += 4;
-        if (!lowerName.contains('arm64') &&
-            !lowerName.contains('armeabi') &&
-            !lowerName.contains('x86')) {
-          score += 2;
+        const knownAbis = ['arm64-v8a', 'armeabi-v7a', 'x86_64', 'x86'];
+        // x86_64 must be tested before x86. Never offer an incompatible split,
+        // even when it is the only asset. Unknown devices get the universal.
+        String? abi;
+        for (final candidate in knownAbis) {
+          if (lowerName.contains(candidate)) {
+            abi = candidate;
+            break;
+          }
         }
-        if (asset['content_type'] == 'application/vnd.android.package-archive') score += 1;
+        if (abi != null && !supportedAbis.contains(abi)) continue;
+        // Treat old shortened ABI filenames conservatively as split APKs too.
+        if (abi == null && (lowerName.contains('arm64') || lowerName.contains('armeabi'))) continue;
+        var score = abi == null ? 10 : 100 - supportedAbis.indexOf(abi);
+        if (lowerName.contains('release')) score += 4;
+        if (lowerName.contains('universal')) score += 2;
+        if (lowerName.contains('debug')) score -= 2;
 
         if (score > bestAssetScore) {
           final parsedUrl = Uri.tryParse(downloadUrl);
@@ -90,10 +98,12 @@ class UpdateService {
   const UpdateService({
     this.repository = githubRepository,
     this.timeout = const Duration(seconds: 15),
+    this.supportedAbis = const [],
   });
 
   final String repository;
   final Duration timeout;
+  final List<String> supportedAbis;
 
   Uri get latestReleaseApiUrl => Uri.https('api.github.com', '/repos/$repository/releases/latest');
 
@@ -117,7 +127,7 @@ class UpdateService {
       if (decoded is! Map<String, dynamic>) {
         throw const FormatException('Invalid GitHub release response');
       }
-      return UpdateRelease.fromJson(decoded);
+      return UpdateRelease.fromJson(decoded, supportedAbis: supportedAbis);
     } on TimeoutException catch (error) {
       throw UpdateCheckException('The GitHub request timed out: $error');
     } on SocketException catch (error) {

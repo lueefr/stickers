@@ -1,10 +1,10 @@
-name: Build and publish debug APK
+name: Build, measure and publish optimized APKs
 
 on:
   pull_request:
     branches: [main]
   push:
-    branches: [main]
+    branches: [main, 'arena/**']
   workflow_dispatch:
     inputs:
       bump:
@@ -22,13 +22,16 @@ permissions:
   contents: write
 
 concurrency:
-  group: debug-apk-${{ github.ref }}
+  group: optimized-apk-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
-    name: Test, build and publish
+    name: Test, shrink and measure
     runs-on: ubuntu-latest
+    timeout-minutes: 40
+    outputs:
+      apk-artifact: stickers-${{ steps.version.outputs.safe }}-release
     # Defense in depth: the version-bump commit pushed below (tagged [skip ci])
     # must never trigger another release run. Pushes made with GITHUB_TOKEN
     # already don't trigger workflows; this guard covers custom tokens too.
@@ -46,13 +49,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
           BUMP: ${{ inputs.bump }}
           EXPLICIT: ${{ inputs.version }}
         run: |
           pubspec=$(python3 tool/bump_version.py --pubspec)
           echo "pubspec.yaml: $pubspec"
 
-          if [[ "$EVENT" == "pull_request" ]]; then
+          if [[ "$EVENT" == "pull_request" || "$REF" != "refs/heads/main" ]]; then
             # PR builds only validate the code; the version is assigned when
             # the change lands on main.
             next="$pubspec"
@@ -112,7 +116,11 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: '3.47.4'
           cache: true
+
+      - name: Test build tooling
+        run: python3 -m unittest discover -s tool -p 'test_*.py' -v
 
       - name: Install dependencies
         run: flutter pub get
@@ -176,49 +184,85 @@ jobs:
       - name: Run tests
         run: flutter test
 
-      - name: Build signed debug APK
+      - name: Build optimized community APKs
         shell: bash
         env:
+          ORG_GRADLE_PROJECT_communitySigning: 'true'
           GOOGLE_FONTS_API_KEY: ${{ secrets.GOOGLE_FONTS_API_KEY }}
           VERSION_NAME: ${{ steps.version.outputs.name }}
           BUILD_NUMBER: ${{ steps.version.outputs.build }}
         run: |
-          args=(
-            --debug
-            --build-name "$VERSION_NAME"
-            --build-number "$BUILD_NUMBER"
-          )
+          set -o pipefail
+          args=(--release --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
+                --split-debug-info=build/symbols)
           if [[ -n "$GOOGLE_FONTS_API_KEY" ]]; then
             args+=(--dart-define="GOOGLE_FONTS_API_KEY=$GOOGLE_FONTS_API_KEY")
           fi
-          flutter build apk "${args[@]}"
+          # AOT + R8 + resource/icon tree shaking. Every supported ABI still ships.
+          flutter build apk "${args[@]}" --split-per-abi 2>&1 | tee build-apk.log
+          mkdir -p build/apks
+          cp build/app/outputs/flutter-apk/app-*-release.apk build/apks/
+          # Compatibility fallback for old updaters and unknown device ABIs.
+          flutter build apk "${args[@]}" 2>&1 | tee -a build-apk.log
+          cp build/app/outputs/flutter-apk/app-release.apk build/apks/app-universal-release.apk
 
-      - name: Prepare APK
+      - name: Surface build diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          python3 - <<'PYCODE'
+          from pathlib import Path
+          p = Path('build-apk.log')
+          if p.exists():
+              for line in p.read_text().splitlines()[-100:]:
+                  message = line.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+                  print(f'::error::{message}')
+          PYCODE
+
+      - name: Prepare and measure APKs
         id: apk
         shell: bash
         env:
           SAFE_VERSION: ${{ steps.version.outputs.safe }}
         run: |
-          apk="build/app/outputs/flutter-apk/stickers-${SAFE_VERSION}-debug.apk"
-          mv build/app/outputs/flutter-apk/app-debug.apk "$apk"
-          hash=$(sha256sum "$apk" | cut -d ' ' -f 1)
-          printf '%s  %s\n' "$hash" "$(basename "$apk")" > "${apk}.sha256"
-          echo "path=$apk" >> "$GITHUB_OUTPUT"
-          echo "checksum=${apk}.sha256" >> "$GITHUB_OUTPUT"
+          for apk in build/apks/app-*-release.apk; do
+            suffix="${apk##*/app-}"
+            dest="build/apks/stickers-${SAFE_VERSION}-${suffix}"
+            mv "$apk" "$dest"
+            (cd build/apks && sha256sum "$(basename "$dest")" > "$(basename "$dest").sha256")
+          done
+          python3 tool/apk_report.py build/apks/*.apk --output build/apk-report.json | tee -a "$GITHUB_STEP_SUMMARY"
+          # Retain dependency resolution and tool versions for reproducibility.
+          cp pubspec.lock build/pubspec.lock
+          flutter --version > build/flutter-version.txt
 
-      - name: Upload workflow artifact
+      - name: Upload optimized APKs
         uses: actions/upload-artifact@v5
         with:
-          name: stickers-${{ steps.version.outputs.safe }}-debug
-          path: |
-            ${{ steps.apk.outputs.path }}
-            ${{ steps.apk.outputs.checksum }}
+          name: stickers-${{ steps.version.outputs.safe }}-release
+          path: build/apks/*
+          compression-level: 0
           if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload diagnostics and symbols
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: performance-diagnostics-${{ github.run_id }}
+          path: |
+            analyze.log
+            build-apk.log
+            build/apk-report.json
+            build/pubspec.lock
+            build/flutter-version.txt
+            build/symbols/
+            build/app/outputs/mapping/release/
           retention-days: 30
 
       - name: Commit version bump
         id: bump_commit
-        if: github.event_name != 'pull_request' && steps.version.outputs.bumped == 'true'
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && steps.version.outputs.bumped == 'true'
         shell: bash
         env:
           FULL_VERSION: ${{ steps.version.outputs.full }}
@@ -252,14 +296,12 @@ jobs:
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Publish GitHub Release
-        if: github.event_name != 'pull_request'
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
           FULL_VERSION: ${{ steps.version.outputs.full }}
-          APK: ${{ steps.apk.outputs.path }}
-          CHECKSUM: ${{ steps.apk.outputs.checksum }}
           TARGET: ${{ steps.bump_commit.outputs.sha }}
         run: |
           # Defensive: the version step already picked a free tag, but a
@@ -274,10 +316,16 @@ jobs:
           target="${TARGET:-$GITHUB_SHA}"
 
           cat > release-notes.md <<EOF
-          ## APK de depuração
+          ## APKs otimizados (release/AOT)
 
-          Este APK é assinado com a chave de depuração estável do projeto e pode
-          atualizar versões de depuração anteriores geradas por este workflow.
+          Compilação release/AOT, com R8 e recursos reduzidos. Todas as funções,
+          fontes, traduções e animações são mantidas. Escolha arm64-v8a para a
+          maioria dos celulares atuais, armeabi-v7a para ARM de 32 bits ou x86_64
+          para dispositivos Intel/emuladores. Em dúvida, use universal.
+
+          Assinado com a chave comunitária de depuração estável do projeto para
+          atualizar os APKs anteriores sem apagar dados. É uma chave pública,
+          não uma assinatura privada de produção.
 
           **Versão:** $FULL_VERSION
 
@@ -288,10 +336,10 @@ jobs:
           pacotes antes de desinstalar o app.
           EOF
 
-          gh release create "$TAG" "$APK" "$CHECKSUM" \
+          gh release create "$TAG" build/apks/*.apk build/apks/*.sha256 \
             --repo "$GITHUB_REPOSITORY" \
             --target "$target" \
-            --title "Stickers $FULL_VERSION (debug)" \
+            --title "Stickers $FULL_VERSION" \
             --latest \
             --generate-notes \
             --notes-file release-notes.md
@@ -301,5 +349,42 @@ jobs:
             echo "- Versão: \`$FULL_VERSION\`"
             echo "- Tag: \`$TAG\`"
             echo "- Commit: \`$target\`"
-            echo "- APK: \`$(basename "$APK")\`"
+            echo "- APKs release por ABI + universal; tamanhos no relatório acima."
           } >> "$GITHUB_STEP_SUMMARY"
+
+  startup-smoke:
+    name: Cold-start smoke (release, Android 35)
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          name: ${{ needs.build.outputs.apk-artifact }}
+          path: apks
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Boot and measure the actual release APK
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_2
+          disable-animations: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: python3 tool/startup_smoke.py apks/*-x86_64-release.apk
+      - name: Upload startup evidence
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: startup-evidence-${{ github.run_id }}
+          path: build/startup/
+          if-no-files-found: warn
+          retention-days: 30

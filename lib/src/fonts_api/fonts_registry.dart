@@ -12,7 +12,7 @@ enum FontType { bundled, custom, googleFont }
 /// Returns the font file path.
 Future<String?> _registerBundledFont(String family, Directory fontsDir) async {
   if (family == "sans-serif" || family == "monospace") return null;
-  File fontFile = File("${fontsDir.path}$family.ttf");
+  File fontFile = File("${fontsDir.path}/$family.ttf");
   if (!await fontFile.exists()) {
     debugPrint("Copying file to ${fontFile.path}");
     await fontFile.create();
@@ -138,11 +138,16 @@ class FontsRegistry {
 
   static bool _init = false;
 
-  static Future<void> init() async {
-    if (_init) {
-      throw Exception("Already initialized or initializing");
-    }
+  static Future<void>? _initialization;
+
+  // Shared by the editor and font manager. No font I/O or native registration
+  // is needed on the home screen. Concurrent callers await the same work.
+  static Future<void> init() => _initialization ??= _initialize();
+
+  static Future<void> _initialize() async {
     _init = true;
+    _entries.clear();
+    _orderedEntries.clear();
 
     try {
       _config = File("${(await getApplicationDocumentsDirectory()).path}/fonts.json");
@@ -162,7 +167,7 @@ class FontsRegistry {
             if (f.type != FontType.bundled) {
               if (f.previewFile != null) {
                 // The cache has been deleted in between
-                if (!File(f.previewFile!).existsSync()) {
+                if (!await File(f.previewFile!).exists()) {
                   f.previewFile = null;
                   if (f.fontFile == null) {
                     _entries.remove(f.family);
@@ -189,6 +194,10 @@ class FontsRegistry {
         debugPrintStack(stackTrace: st);
       }
 
+      // Discard partial entries before fallback; otherwise retries duplicate
+      // fonts in the carousel. The persisted file is not rewritten on failure.
+      _entries.clear();
+      _orderedEntries.clear();
       // Fall back to loading only bundled fonts if config couldn't be read.
       for (final f in _bundledFonts) {
         _entries[f.family] = f;
@@ -196,8 +205,9 @@ class FontsRegistry {
         f.isLoaded = true;
       }
       await loadFonts(_orderedEntries);
-      enqueueSave();
-    } on Exception catch (_) {
+      if (!await _config.exists()) enqueueSave();
+    } catch (_) {
+      _initialization = null;
       _init = false;
       rethrow;
     }

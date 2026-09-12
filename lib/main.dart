@@ -9,8 +9,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:stickers/src/constants.dart';
 import 'package:stickers/src/data/load_store.dart';
 import 'package:stickers/src/data/sticker_pack.dart';
-import 'package:stickers/src/dialogs/eyedropper_dialog.dart';
-import 'package:stickers/src/fonts_api/fonts_registry.dart';
 import 'package:stickers/src/globals.dart';
 
 import 'src/app.dart';
@@ -27,10 +25,6 @@ Future<void> main() async {
   PaintingBinding.instance.imageCache.maximumSize = 500;
   PaintingBinding.instance.imageCache.maximumSizeBytes = 200 << 20;
 
-  // Compile the HSL slider shaders in the background so opening the color
-  // picker later doesn't jank on first paint.
-  unawaited(GradientSliderTrackShape.prime());
-
   LicenseRegistry.addLicense(() async* {
     final license = await rootBundle.loadString('assets/fonts/OFL.txt');
     yield LicenseEntryWithLineBreaks(
@@ -40,26 +34,28 @@ Future<void> main() async {
   });
 
   final settingsService = SettingsService();
-  final packageTask = PackageInfo.fromPlatform().then<void>((result) {
-    info = result;
-  });
   final settingsTask = _loadSettings(settingsService);
   final packsTask = _loadPacks();
 
   // These operations are independent. The previous startup code waited on a
   // mutable task list twice, which serialized parts of initialization and
   // made the first frame needlessly dependent on the second wait.
-  unawaited(_initializeFonts());
   await Future.wait<Object?>([
-    packageTask,
     settingsTask,
     packsTask,
     createDirs(),
   ]);
   packs = await packsTask;
 
-  debugPrint('Startup: ${sw.elapsedMilliseconds}ms');
+  debugPrint('Startup data ready: ${sw.elapsedMilliseconds}ms');
 
+  // Keep the real home screen (with saved theme, locale and library) as the
+  // first frame, not a splash that merely hides unfinished initialization.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    debugPrint('Startup first frame: ${sw.elapsedMilliseconds}ms');
+    unawaited(_loadPackageInfo());
+    unawaited(_reportReady());
+  });
   runApp(StickersApp(settingsController: settingsController));
 }
 
@@ -77,14 +73,20 @@ Future<List<StickerPack>> _loadPacks() async {
   return getPacks();
 }
 
-Future<void> _initializeFonts() async {
+Future<void> _loadPackageInfo() async {
   try {
-    await FontsRegistry.init();
-  } catch (error, stackTrace) {
-    // Fonts are optional at startup; the editor can still use the platform
-    // font and the fonts page can report/retry the failed registration.
-    debugPrint('Font initialization failed: $error');
-    debugPrintStack(stackTrace: stackTrace);
+    info = await PackageInfo.fromPlatform();
+  } catch (error) {
+    debugPrint('Package info unavailable: $error');
+  }
+}
+
+Future<void> _reportReady() async {
+  if (!Platform.isAndroid) return;
+  try {
+    await const MethodChannel('de.loicezt.stickers/methods').invokeMethod<void>('reportReady');
+  } on PlatformException catch (error) {
+    debugPrint('Startup metric unavailable: $error');
   }
 }
 

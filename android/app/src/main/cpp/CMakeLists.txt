@@ -56,3 +56,21 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
         webp-static
         android
         log)
+
+# Hide the static codec API from the shared object's dynamic symbol table.
+# JNIEXPORT still exposes the JNI entry points. Section GC removes genuinely
+# unreachable codec code; keep SIMD and all animated encode/decode features.
+foreach(native_target webp-static ${CMAKE_PROJECT_NAME})
+    set_target_properties(${native_target} PROPERTIES
+        C_VISIBILITY_PRESET hidden
+        CXX_VISIBILITY_PRESET hidden
+        VISIBILITY_INLINES_HIDDEN YES)
+    target_compile_options(${native_target} PRIVATE
+        $<$<CONFIG:Release>:-ffunction-sections>
+        $<$<CONFIG:Release>:-fdata-sections>
+        $<$<CONFIG:Release>:-flto=thin>)
+endforeach()
+target_link_options(${CMAKE_PROJECT_NAME} PRIVATE
+    $<$<CONFIG:Release>:-flto=thin>
+    $<$<CONFIG:Release>:-Wl,--gc-sections>
+    $<$<CONFIG:Release>:-Wl,--exclude-libs,ALL>)
