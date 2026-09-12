@@ -89,23 +89,33 @@ class _GoogleFontPreviewState extends State<GoogleFontPreview> {
 
   @override
   void initState() {
+    super.initState();
+    if (FontsRegistry.contains(widget.font.family)) {
+      _future = Future.value(0);
+      return;
+    }
+    // A fling on the Google fonts list (1000+ items) instantiates one card
+    // per item passing through the viewport, each firing 2 HTTP requests +
+    // a FontLoader.load() right away in initState — even for fonts visible
+    // for a fraction of a second. FontLoader.load() invalidates the whole
+    // engine's text shaping cache, so several completions landing during a
+    // fast scroll cause real stutter, on top of the wasted bandwidth.
+    // Delay the fetch itself (not just the spinner) so only fonts the user
+    // actually stops on trigger a download; cards scrolled past before the
+    // delay are already unmounted and never start the fetch. Same debounce
+    // principle as FontsRegistry.enqueueSave().
     Future.delayed(const Duration(milliseconds: 300), () {
       if (!mounted) return;
       setState(() {
         _delayOver = true;
+        _future = downloadAndRegisterFontPreview(widget.font).then((_) {
+          // We have to return something here or the FutureBuilder doesn't work as it should
+          if (!mounted) return 1;
+          setState(() {});
+          return 0;
+        });
       });
     });
-    if (!FontsRegistry.contains(widget.font.family)) {
-      _future = downloadAndRegisterFontPreview(widget.font).then((_) {
-        // We have to return something here or the FutureBuilder doesn't work as it should
-        if (!mounted) return 1;
-        setState(() {});
-        return 0;
-      });
-    } else {
-      _future = Future.value(0);
-    }
-    super.initState();
   }
 
   @override
