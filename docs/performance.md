@@ -142,3 +142,46 @@ com o debug no mesmo emulador e discrimina fases Dart para investigar a diferen�
 Os tamanhos e tempos finais são os do run/JSON final; não são estimativas pela
 soma de arquivos fonte. O engine Flutter e as bibliotecas dos plugins continuam
 sendo um piso real de tamanho e inicialização.
+
+
+### Validação final estendida
+
+Run [34713088443](https://github.com/lueefr/stickers/actions/runs/34713088443),
+commit `8c9ab0a`: **sucesso**. Os quatro tamanhos permaneceram iguais aos da
+tabela acima. Analyze, testes Python/Flutter, builds/shrinking, inspeção de
+assets/símbolos, atualização in-place e navegação até fontes passaram.
+
+| Medida no mesmo emulador Android 35 x86_64 | Resultado |
+|---|---:|
+| `am start` mediano, debug histórico | 7.108 ms |
+| `am start` mediano, release | 3.074 ms |
+| Redução observada de `am start` | 56,75% |
+| Primeiro lançamento do release após atualização, home visível | 2.230 ms |
+| Home visível, mediana das cinco reinicializações release | 1.916 ms |
+| Home visível, máximo das cinco reinicializações release | 2.821 ms |
+| Dados de startup Dart prontos, mediana | 618 ms |
+| Primeiro frame Dart construído, mediana | 640 ms |
+
+`am start`, home visível e cronômetro Dart têm origens/limites diferentes e não
+são intercambiáveis. A diferença entre os dois runs release demonstra a
+variabilidade do emulador. Esta comparação sequencial é evidência de smoke /
+melhoria observada, não benchmark estatístico nem promessa para todo celular.
+**Startup quase instantâneo em aparelho físico ainda não foi comprovado.**
+
+O APK original foi atualizado com `adb install -r`, sem limpar dados. Após isso,
+o smoke abriu Settings → Fonts manager e encontrou Lobster: a inicialização
+lazy e o registro nativo de fontes sobreviveram ao R8. GIF/vídeo/WhatsApp e a
+matriz completa de aparelhos continuam sujeitos ao checklist funcional acima.
+
+Artifacts do run final:
+- `stickers-1.5.9-27-release`.
+- `performance-diagnostics-34713088443`.
+- `startup-evidence-34713088443`.
+
+```sh
+gh run download 34713088443 --repo lueefr/stickers -n stickers-1.5.9-27-release
+```
+
+A publicação de release foi corretamente **ignorada** nesta branch; está
+reservada a `main` após build + smoke. Os únicos avisos não bloqueantes foram
+avisos das actions v5 sobre migração do runtime Node 20 para Node 24.
