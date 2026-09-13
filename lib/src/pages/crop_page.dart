@@ -378,22 +378,38 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
                                         ));
                                 return;
                               }
-                              final cropped = await cropSticker(
-                                  state.getCropRect()!,
-                                  state.rawImageData,
-                                  widget.pack,
-                                  widget.index,
-                                  _editorController.rotateDegrees);
-                              final output = await saveTemp(cropped);
-                              if (!context.mounted) return;
-                              Navigator.of(context).pushNamed(
-                                "/edit",
-                                arguments: EditArguments(
-                                  pack: widget.pack,
-                                  index: widget.index,
-                                  mediaPath: output.path,
-                                ),
-                              );
+                              try {
+                                final cropped = await cropSticker(
+                                    state.getCropRect()!,
+                                    state.rawImageData,
+                                    widget.pack,
+                                    widget.index,
+                                    _editorController.rotateDegrees);
+                                final output = await saveTemp(cropped);
+                                if (!context.mounted) return;
+                                Navigator.of(context).pushNamed(
+                                  "/edit",
+                                  arguments: EditArguments(
+                                    pack: widget.pack,
+                                    index: widget.index,
+                                    mediaPath: output.path,
+                                  ),
+                                );
+                              } catch (e) {
+                                // Do not leave the user with a button that
+                                // looks like it did nothing: the exception
+                                // would otherwise only reach the Flutter error
+                                // zone, which is invisible on a release build.
+                                debugPrint("Couldn't finish the crop: $e");
+                                if (!context.mounted) return;
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => ErrorDialog(
+                                    title: AppLocalizations.of(context)!.done,
+                                    message: AppLocalizations.of(context)!.errorMessage + e.toString(),
+                                  ),
+                                );
+                              }
                             },
                             child: Text(AppLocalizations.of(context)!.done),
                           ),

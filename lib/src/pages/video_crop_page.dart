@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:stickers/generated/intl/app_localizations.dart';
 import 'package:stickers/src/constants.dart';
+import 'package:stickers/src/data/load_store.dart';
 import 'package:stickers/src/data/sticker_pack.dart';
 import 'package:stickers/src/dialogs/error_dialog.dart';
 import 'package:stickers/src/pages/crop_page.dart';
@@ -351,6 +352,9 @@ class _VideoCropPageState extends State<VideoCropPage> {
     setState(() => _exporting = true);
     try {
       _controller.pause();
+      // The cache directory can be wiped by the OS at any time without the app
+      // restarting, so make sure it is there before writing into it.
+      await ensureMediaCacheDir();
       final output = "$mediaCacheDir/import_${DateTime.now().millisecondsSinceEpoch}.mp4";
       await service.start(
         inputFile: widget.imagePath,

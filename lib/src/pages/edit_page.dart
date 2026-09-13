@@ -549,6 +549,9 @@ else if (videoController != null)
     final overlayOption = ImageEditorOption()..outputFormat = const OutputFormat.webp_lossless();
     final out = await ImageEditor.editImageAndGetFile(image: overlayPng, imageEditorOption: overlayOption);
     final service = OverlayAndEncodeService();
+    // The cache directory can be wiped by the OS at any time without the app
+    // restarting, so make sure it is there before writing into it.
+    await ensureMediaCacheDir();
     final output = File("$mediaCacheDir/exported_${DateTime.now().millisecondsSinceEpoch}.webp");
     Stopwatch sw = Stopwatch()..start();
     Uint8List? data;
