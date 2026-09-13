@@ -422,6 +422,9 @@ class StickerPackPageState extends State<StickerPackPage> {
           ),
         ),
       );
+      // The cache directory can be wiped by the OS at any time without the app
+      // restarting, so make sure it is there before writing into it.
+      await ensureMediaCacheDir();
       final service = GifToWebPService();
       Uint8List? best;
       double quality = 60;

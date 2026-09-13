@@ -56,8 +56,7 @@ Future<void> exportPacks(List<StickerPack> selected) async {
 Future<void> importPack(File f) async {
   //TODO show progress
   Stopwatch sw = Stopwatch()..start();
-  Directory importDir = Directory(mediaCacheDir);
-  await importDir.create(recursive: true);
+  final Directory importDir = await ensureMediaCacheDir();
   final unzipDir = await importDir.createTemp("pack_");
   final createdDirs = <Directory>[];
   try {
@@ -457,7 +456,21 @@ Future<void> _clearMediaCache() async {
   } on FileSystemException catch (_) {}
 }
 
+/// Makes sure the media cache directory exists and returns it.
+///
+/// The OS (or "Clear cache" in the Android settings) can wipe the cache tree at
+/// any time, and it usually does so *without* killing the app process. The
+/// [mediaCacheDir] variable then keeps pointing at a directory that is no
+/// longer there, and only a cold start — the one time [createDirs] runs —
+/// brings it back. Everything that writes into the media cache therefore has to
+/// recreate it first. [Directory.create] is idempotent and cheap, so this costs
+/// nothing on the happy path.
+Future<Directory> ensureMediaCacheDir() => Directory(mediaCacheDir).create(recursive: true);
+
 Future<File> saveTemp(Uint8List data) async {
+  // See [ensureMediaCacheDir]: the cache can disappear under us between two
+  // writes, so it cannot be created once at startup only.
+  await ensureMediaCacheDir();
   File output = File("$mediaCacheDir/${DateTime.now().millisecondsSinceEpoch}.tmp.webp");
   await output.writeAsBytes(data);
   return output;
