@@ -56,8 +56,7 @@ Future<void> exportPacks(List<StickerPack> selected) async {
 Future<void> importPack(File f) async {
   //TODO show progress
   Stopwatch sw = Stopwatch()..start();
-  Directory importDir = Directory(mediaCacheDir);
-  await importDir.create(recursive: true);
+  final Directory importDir = await ensureMediaCacheDir();
   final unzipDir = await importDir.createTemp("pack_");
   final createdDirs = <Directory>[];
   try {
