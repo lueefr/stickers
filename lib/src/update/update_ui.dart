@@ -4,8 +4,8 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:stickers/generated/intl/app_localizations.dart';
 import 'package:stickers/src/globals.dart';
-import 'package:url_launcher/url_launcher.dart';
 
+import 'update_download_dialog.dart';
 import 'update_service.dart';
 
 const _lastAutomaticCheckKey = 'lastAutomaticUpdateCheck';
@@ -49,8 +49,9 @@ Future<void> checkForAppUpdate(
     info ??= packageInfo;
     List<String> abis = const [];
     try {
-      abis = await const MethodChannel('de.loicezt.stickers/methods')
-          .invokeListMethod<String>('supportedAbis') ?? const [];
+      final deviceAbis = await const MethodChannel('de.loicezt.stickers/methods')
+          .invokeListMethod<String>('supportedAbis');
+      abis = deviceAbis ?? const [];
     } on PlatformException catch (_) {
       // Universal APK remains a safe fallback when ABI discovery fails.
     } on MissingPluginException catch (_) {
@@ -70,7 +71,19 @@ Future<void> checkForAppUpdate(
       if (userInitiated) await _showUpToDateDialog(context, currentVersion);
       return;
     }
-    await _showUpdateDialog(context, release, currentVersion);
+
+    final shouldDownload = await _showUpdateDialog(
+      context,
+      release,
+      currentVersion,
+    );
+    if (shouldDownload && context.mounted && release.apkDownloadUrl != null) {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => UpdateDownloadDialog(release: release),
+      );
+    }
   } catch (_) {
     if (!context.mounted) return;
     messenger?.hideCurrentSnackBar();
@@ -91,7 +104,7 @@ Future<bool> _automaticCheckIsDue() async {
   return true;
 }
 
-Future<void> _showUpdateDialog(
+Future<bool> _showUpdateDialog(
   BuildContext context,
   UpdateRelease release,
   String currentVersion,
@@ -100,7 +113,7 @@ Future<void> _showUpdateDialog(
   var notes = release.releaseNotes.trim();
   if (notes.length > 4000) notes = '${notes.substring(0, 4000)}…';
 
-  await showDialog<void>(
+  final shouldDownload = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
       scrollable: true,
@@ -123,24 +136,27 @@ Future<void> _showUpdateDialog(
             const SizedBox(height: 8),
             SelectableText(notes),
           ],
+          if (release.apkDownloadUrl == null) ...[
+            const SizedBox(height: 16),
+            Text(strings.updateApkUnavailable),
+          ],
         ],
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(dialogContext).pop(),
+          onPressed: () => Navigator.of(dialogContext).pop(false),
           child: Text(strings.later),
         ),
-        FilledButton.icon(
-          onPressed: () async {
-            Navigator.of(dialogContext).pop();
-            await _openUpdate(context, release.updateUrl);
-          },
-          icon: const Icon(Icons.download),
-          label: Text(strings.downloadUpdate),
-        ),
+        if (release.apkDownloadUrl != null)
+          FilledButton.icon(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            icon: const Icon(Icons.download),
+            label: Text(strings.downloadUpdate),
+          ),
       ],
     ),
   );
+  return shouldDownload ?? false;
 }
 
 Future<void> _showUpToDateDialog(BuildContext context, String currentVersion) {
@@ -167,31 +183,6 @@ Future<void> _showCheckFailedDialog(BuildContext context) {
     builder: (dialogContext) => AlertDialog(
       title: Text(strings.updateCheckFailed),
       content: Text(strings.updateCheckFailedMessage),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(dialogContext).pop(),
-          child: Text(MaterialLocalizations.of(dialogContext).okButtonLabel),
-        ),
-      ],
-    ),
-  );
-}
-
-Future<void> _openUpdate(BuildContext context, Uri updateUrl) async {
-  var opened = false;
-  try {
-    opened = await launchUrl(updateUrl, mode: LaunchMode.externalApplication);
-  } catch (_) {
-    // The error dialog below gives the user a localized, actionable result.
-  }
-  if (opened || !context.mounted) return;
-
-  final strings = AppLocalizations.of(context)!;
-  await showDialog<void>(
-    context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: Text(strings.error),
-      content: Text(strings.couldntOpenUpdate),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(dialogContext).pop(),

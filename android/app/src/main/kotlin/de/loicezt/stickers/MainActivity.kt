@@ -1,10 +1,15 @@
 package de.loicezt.stickers
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.SystemClock
+import android.provider.Settings
 import android.util.Log
 import androidx.annotation.NonNull
 import androidx.annotation.RequiresApi
+import androidx.core.content.FileProvider
 import de.loicezt.stickers.video.CropAndScale
 import de.loicezt.stickers.video.GifToWebP
 import de.loicezt.stickers.video.OverlayAndEncode
@@ -26,6 +31,10 @@ class MainActivity : FlutterActivity() {
     private val METHOD_CHANNEL_NAME = "de.loicezt.stickers/methods"
     private val TRIM_CHANNEL_NAME = "de.loicezt.stickers/progress_trim"
     private val ECODE_CHANNEL_NAME = "de.loicezt.stickers/progress_encode"
+    private val INSTALL_SOURCE_REQUEST_CODE = 62001
+
+    private var pendingInstallFile: File? = null
+    private var pendingInstallResult: MethodChannel.Result? = null
 
     private val createdAt = SystemClock.elapsedRealtime()
     private var homeReady = false
@@ -63,6 +72,9 @@ class MainActivity : FlutterActivity() {
         ).setMethodCallHandler { call, result ->
             when (call.method) {
                 "supportedAbis" -> result.success(Build.SUPPORTED_ABIS.toList())
+                "installApk" -> {
+                    installDownloadedApk(call.arguments as? String, result)
+                }
                 "reportReady" -> {
                     // Sent after the first real home frame, with settings and
                     // packs loaded. Visible in release logcat for CI/device runs.
@@ -217,6 +229,101 @@ class MainActivity : FlutterActivity() {
                 }
             }
         )
+    }
+
+    private fun installDownloadedApk(path: String?, result: MethodChannel.Result) {
+        if (path.isNullOrBlank()) {
+            result.error("INVALID_APK", "An APK file path is required.", null)
+            return
+        }
+
+        val apkFile = try {
+            File(path).canonicalFile
+        } catch (error: Exception) {
+            result.error("INVALID_APK", error.message, null)
+            return
+        }
+        val updatesDirectory = File(cacheDir, "updates").canonicalFile
+        val allowedPrefix = updatesDirectory.path + File.separator
+        if (!apkFile.path.startsWith(allowedPrefix) ||
+            !apkFile.isFile ||
+            !apkFile.name.endsWith(".apk", ignoreCase = true)
+        ) {
+            result.error("INVALID_APK", "The downloaded APK file is unavailable.", null)
+            return
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            !packageManager.canRequestPackageInstalls()
+        ) {
+            if (pendingInstallResult != null) {
+                result.error("INSTALL_IN_PROGRESS", "An APK installation is already in progress.", null)
+                return
+            }
+            pendingInstallFile = apkFile
+            pendingInstallResult = result
+            try {
+                val settingsIntent = Intent(
+                    Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                    Uri.parse("package:$packageName"),
+                )
+                startActivityForResult(settingsIntent, INSTALL_SOURCE_REQUEST_CODE)
+            } catch (error: Exception) {
+                pendingInstallFile = null
+                pendingInstallResult = null
+                result.error("INSTALL_SETTINGS_UNAVAILABLE", error.message, null)
+            }
+            return
+        }
+
+        openApkInstaller(apkFile, result)
+    }
+
+    private fun openApkInstaller(apkFile: File, result: MethodChannel.Result) {
+        try {
+            val apkUri = FileProvider.getUriForFile(
+                this,
+                "$packageName.fileprovider",
+                apkFile,
+            )
+            val installerIntent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(apkUri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(installerIntent)
+            result.success(null)
+        } catch (error: ActivityNotFoundException) {
+            result.error("INSTALLER_NOT_FOUND", error.message, null)
+        } catch (error: Exception) {
+            result.error("INSTALL_FAILED", error.message, null)
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != INSTALL_SOURCE_REQUEST_CODE) return
+
+        val result = pendingInstallResult ?: return
+        val apkFile = pendingInstallFile
+        pendingInstallResult = null
+        pendingInstallFile = null
+
+        if (apkFile == null || !apkFile.isFile) {
+            result.error("INVALID_APK", "The downloaded APK file is unavailable.", null)
+            return
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            !packageManager.canRequestPackageInstalls()
+        ) {
+            result.error(
+                "INSTALL_PERMISSION_DENIED",
+                "Permission to install unknown apps was not granted.",
+                null,
+            )
+            return
+        }
+        openApkInstaller(apkFile, result)
     }
 
     override fun onDestroy() {
