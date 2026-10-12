@@ -249,63 +249,69 @@ class StickerPackPageState extends State<StickerPackPage> {
 
   Future<void> _showStaticStickerOptions(int index) async {
     final l10n = AppLocalizations.of(context)!;
+    // isScrollControlled + a scroll view: this sheet holds five entries and the
+    // default sheet is capped at 9/16 of the screen, which overflows on a short
+    // screen. The entries stay reachable instead of being clipped.
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo),
-              title: Text(l10n.newImage),
-              onTap: () {
-                Navigator.of(context).pop();
-                _pickAndEditSingleImage(index);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.collections),
-              title: Text(l10n.multipleImages),
-              subtitle: Text(l10n.multipleImagesHint),
-              onTap: () {
-                Navigator.of(context).pop();
-                _pickAndEditMultipleImages();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.auto_fix_high),
-              title: Text(l10n.startWithExistingSticker),
-              onTap: () {
-                Navigator.of(context).pop();
-                _startWithExistingSticker();
-              },
-            ),
-            const Divider(height: 1),
-            // A static pack cannot hold video or GIF stickers: WhatsApp only
-            // accepts media of the kind the pack was created for, and it
-            // refuses the whole pack otherwise. The sources are offered here
-            // anyway so a video or a GIF can be turned into a sticker without
-            // the user having to know that it needs an animated pack.
-            ListTile(
-              leading: const Icon(Icons.video_library),
-              title: Text(l10n.video),
-              subtitle: Text(l10n.videoHint),
-              onTap: () {
-                Navigator.of(context).pop();
-                _createAnimatedPackFor(_pickAndEditVideo);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.gif_box),
-              title: Text(l10n.gif),
-              subtitle: Text(l10n.gifHint),
-              onTap: () {
-                Navigator.of(context).pop();
-                _createAnimatedPackFor(_pickGif);
-              },
-            ),
-          ],
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo),
+                title: Text(l10n.newImage),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAndEditSingleImage(index);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.collections),
+                title: Text(l10n.multipleImages),
+                subtitle: Text(l10n.multipleImagesHint),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAndEditMultipleImages();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.auto_fix_high),
+                title: Text(l10n.startWithExistingSticker),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _startWithExistingSticker();
+                },
+              ),
+              const Divider(height: 1),
+              // A static pack cannot hold video or GIF stickers: WhatsApp only
+              // accepts media of the kind the pack was created for, and it
+              // refuses the whole pack otherwise. The sources are offered here
+              // anyway so a video or a GIF can be turned into a sticker without
+              // the user having to know that it needs an animated pack.
+              ListTile(
+                leading: const Icon(Icons.video_library),
+                title: Text(l10n.video),
+                subtitle: Text(l10n.videoHint),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _createAnimatedPackFor(_pickAndEditVideo);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.gif_box),
+                title: Text(l10n.gif),
+                subtitle: Text(l10n.gifHint),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _createAnimatedPackFor(_pickGif);
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -343,29 +349,32 @@ class StickerPackPageState extends State<StickerPackPage> {
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.video_library),
-              title: Text(l10n.video),
-              subtitle: Text(l10n.videoHint),
-              onTap: () {
-                Navigator.of(context).pop();
-                _pickAndEditVideo(widget.pack, index);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.gif_box),
-              title: Text(l10n.gif),
-              subtitle: Text(l10n.gifHint),
-              onTap: () {
-                Navigator.of(context).pop();
-                _pickGif(widget.pack, index);
-              },
-            ),
-          ],
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.video_library),
+                title: Text(l10n.video),
+                subtitle: Text(l10n.videoHint),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAndEditVideo(widget.pack, index);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.gif_box),
+                title: Text(l10n.gif),
+                subtitle: Text(l10n.gifHint),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickGif(widget.pack, index);
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );

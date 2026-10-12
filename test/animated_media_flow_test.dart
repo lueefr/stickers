@@ -81,7 +81,14 @@ void main() {
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
       await tester.pump(const Duration(milliseconds: 50));
     }
-    await tester.pumpAndSettle();
+    // Let a notice that was just shown run out, so the test does not end with
+    // its timer still pending. Bounded pumps instead of pumpAndSettle: a flow
+    // that did not finish would otherwise only time out (a running progress
+    // indicator never settles), which hides the real failure.
+    await tester.pump(const Duration(seconds: 6));
+    for (var round = 0; round < 10; round++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
   }
 
   /// Opens the "new sticker" sheet of the pack page by tapping the empty cell.

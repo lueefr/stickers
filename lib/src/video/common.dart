@@ -70,24 +70,20 @@ AnimatedTrimWindow clampAnimatedTrimWindow({
     return AnimatedTrimWindow(start: windowStart, end: windowEnd);
   }
 
+  // Only the handle that is being dragged moves: it stops the limit short of
+  // the other one, which stays where the user put it. This can never leave the
+  // video: the fixed handle is inside it, and a window that would need to end
+  // outside of it is shorter than the limit and returned above.
   if (movedEnd) {
-    // The end is the handle under the finger: it stops at the limit and the
-    // start stays where the user put it.
     windowEnd = windowStart + limit;
-    if (windowEnd > 1) {
-      windowEnd = 1;
-      windowStart = 1 - limit;
-    }
   } else {
-    // The start is the handle under the finger: it stops the limit short of
-    // the end, and only a start that would leave the video moves the end too.
     windowStart = windowEnd - limit;
-    if (windowStart < 0) {
-      windowStart = 0;
-      windowEnd = limit;
-    }
   }
-  return AnimatedTrimWindow(start: windowStart, end: windowEnd);
+  // Rounding only, so the value handed to RangeSlider is always in range.
+  return AnimatedTrimWindow(
+    start: windowStart.clamp(0.0, 1.0).toDouble(),
+    end: windowEnd.clamp(0.0, 1.0).toDouble(),
+  );
 }
 
 // Enums and classes to mirror the Kotlin side

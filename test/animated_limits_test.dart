@@ -67,21 +67,22 @@ void main() {
       expect(window.end - window.start, closeTo(limit, 1e-9));
     });
 
-    test('pushes the other handle when the moved start reached the end', () {
+    test('pulls the dragged start forward to the limit', () {
       final window = clampAnimatedTrimWindow(
-        start: 1,
-        end: 1,
+        start: 0,
+        end: .8,
         videoDuration: oneMinute,
         movedEnd: false,
       );
-      expect(window.end, 1);
+      expect(window.end, closeTo(.8, 1e-9), reason: 'the end the user chose stays put');
       expect(window.end - window.start, closeTo(limit, 1e-9));
     });
 
     test('never leaves the video, whichever handle is dragged', () {
       for (final movedEnd in [true, false]) {
+        // The whole video selected: the longest window there is.
         final window = clampAnimatedTrimWindow(
-          start: 1,
+          start: 0,
           end: 1,
           videoDuration: oneMinute,
           movedEnd: movedEnd,
