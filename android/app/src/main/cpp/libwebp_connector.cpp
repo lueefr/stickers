@@ -20,11 +20,31 @@ struct EncoderState {
     WebPConfig config;
     int frame_width = 0;
     int frame_height = 0;
+    // Bookkeeping used to end the animation at the right timestamp. Closing the
+    // animation by adding a null frame at timestamp 0 (as this used to do) fails
+    // with "timestamps must be non-decreasing" as soon as a frame was added,
+    // which leaves the last frame with an arbitrary duration.
+    int last_timestamp_ms = -1;
+    int frame_interval_ms = 40;
 };
 
 // Use a static pointer to hold the state across JNI calls.
 // In a more complex app, you might pass a pointer back to Kotlin as a long.
 static EncoderState *state = nullptr;
+
+/**
+ * Deletes the current encoder state, if any.
+ * Does nothing when no encoder is initialized.
+ */
+static void freeEncoderState() {
+    if (state == nullptr) return;
+    if (state->anim_encoder != nullptr) {
+        WebPAnimEncoderDelete(state->anim_encoder);
+        state->anim_encoder = nullptr;
+    }
+    delete state;
+    state = nullptr;
+}
 
 
 extern "C" {
@@ -129,8 +149,11 @@ Java_de_loicezt_stickers_video_LibWebP_nativeInitEncoder(
         jobject configJava) {
 
     if (state != nullptr) {
-        LOGE("Encoder already initialized. Please release it first.");
-        return JNI_FALSE;
+        // A previous conversion never released its state (an exception or a
+        // cancellation between the init and the release). Dropping it here keeps
+        // one failed conversion from breaking every later one.
+        LOGE("Encoder was still initialized. Releasing the stale state.");
+        freeEncoderState();
     }
 
     state = new EncoderState();
@@ -141,8 +164,7 @@ Java_de_loicezt_stickers_video_LibWebP_nativeInitEncoder(
 
     if (!WebPConfigInit(&state->config)) {
         LOGE("Failed to initialize WebPConfig.");
-        delete state;
-        state = nullptr;
+        freeEncoderState();
         return JNI_FALSE;
     }
     // --- Helper lambdas to reduce boilerplate for JNI calls ---
@@ -243,8 +265,7 @@ Java_de_loicezt_stickers_video_LibWebP_nativeInitEncoder(
 
     if (!WebPValidateConfig(&state->config)) {
         LOGE("Invalid config");
-        delete state;
-        state = nullptr;
+        freeEncoderState();
         return JNI_FALSE;
     }
 
@@ -255,8 +276,7 @@ Java_de_loicezt_stickers_video_LibWebP_nativeInitEncoder(
     state->anim_encoder = WebPAnimEncoderNew(width, height, &anim_options);
     if (state->anim_encoder == nullptr) {
         LOGE("Failed to create new WebPAnimEncoder.");
-        delete state;
-        state = nullptr;
+        freeEncoderState();
         return JNI_FALSE;
     }
 
@@ -311,6 +331,14 @@ Java_de_loicezt_stickers_video_LibWebP_nativeAddFrameYuv(
     // 4. Add the YUV picture to the animation encoder
     if (!WebPAnimEncoderAdd(state->anim_encoder, &pic, timestamp_ms, &state->config)) {
         LOGE("Failed to add YUV frame to WebPAnimEncoder at timestamp %d", timestamp_ms);
+    } else {
+        // Same bookkeeping as nativeAddFrame, so the animation ends at a
+        // timestamp greater than the last frame's.
+        if (state->last_timestamp_ms >= 0) {
+            const int delta = timestamp_ms - state->last_timestamp_ms;
+            if (delta > 0) state->frame_interval_ms = delta;
+        }
+        state->last_timestamp_ms = timestamp_ms;
     }
 
     // WebPPictureFree(&pic) is NOT needed here because we didn't allocate memory with it.
@@ -408,7 +436,12 @@ Java_de_loicezt_stickers_video_LibWebP_nativeAddFrame(
     pic.use_argb = 1; // We are providing RGBA data
 
     // Import the RGBA data. The stride is the number of bytes per row.
-    WebPPictureImportRGBA(&pic, pixels, state->frame_width * 4);
+    if (!WebPPictureImportRGBA(&pic, pixels, state->frame_width * 4)) {
+        LOGE("Failed to import frame pixels. Error: %s (%d)",
+             getWebPErrorString(pic.error_code), pic.error_code);
+        WebPPictureFree(&pic);
+        return;
+    }
 
     // 4. Add the picture to the animation encoder
     //logWebPConfig(&state->config);
@@ -417,6 +450,14 @@ Java_de_loicezt_stickers_video_LibWebP_nativeAddFrame(
         LOGE("Failed to add frame to WebPAnimEncoder at timestamp %d. Error: %s (%d)",
              timestampMs, error_string, pic.error_code);
     } else {
+        // Remember when the last frame starts and how long the frames are, so
+        // that nativeReleaseEncoder() can end the animation at a timestamp that
+        // is greater than the last frame's.
+        if (state->last_timestamp_ms >= 0) {
+            const int delta = timestampMs - state->last_timestamp_ms;
+            if (delta > 0) state->frame_interval_ms = delta;
+        }
+        state->last_timestamp_ms = timestampMs;
         LOGI("Added frame at Timestamp %d", timestampMs);
     }
 
@@ -431,15 +472,23 @@ Java_de_loicezt_stickers_video_LibWebP_nativeReleaseEncoder(
 
     if (state == nullptr) { /* ... error handling ... */ return nullptr; }
 
-    // Assemble the animation
-    WebPAnimEncoderAdd(state->anim_encoder, nullptr, 0, nullptr);
+    // Assemble the animation.
+    // The timestamp of this empty frame marks the end of the animation. It must
+    // not be lower than the last frame's, otherwise the call fails and the last
+    // frame keeps a default duration.
+    const int frame_interval_ms = state->frame_interval_ms > 0 ? state->frame_interval_ms : 40;
+    const int end_timestamp_ms = state->last_timestamp_ms < 0
+                                 ? 0
+                                 : state->last_timestamp_ms + frame_interval_ms;
+    if (!WebPAnimEncoderAdd(state->anim_encoder, nullptr, end_timestamp_ms, nullptr)) {
+        LOGE("Could not add the end frame at %d ms. The last frame keeps its default duration.",
+             end_timestamp_ms);
+    }
     WebPData webp_data;
     WebPDataInit(&webp_data);
     if (!WebPAnimEncoderAssemble(state->anim_encoder, &webp_data)) {
         LOGE("Failed to assemble final WebP animation.");
-        WebPAnimEncoderDelete(state->anim_encoder);
-        delete state;
-        state = nullptr;
+        freeEncoderState();
         return nullptr;
     }
 
@@ -454,9 +503,7 @@ Java_de_loicezt_stickers_video_LibWebP_nativeReleaseEncoder(
 
     // Cleanup
     WebPDataClear(&webp_data);
-    WebPAnimEncoderDelete(state->anim_encoder);
-    delete state;
-    state = nullptr;
+    freeEncoderState();
 
     LOGI("Native encoder released.");
     return byteArray; // Return the raw data to Kotlin

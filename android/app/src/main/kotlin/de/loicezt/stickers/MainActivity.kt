@@ -46,7 +46,8 @@ class MainActivity : FlutterActivity() {
     }
     private val cropAndScaleDelegate = lazy { CropAndScale() }
     private val cropAndScale by cropAndScaleDelegate
-    private val overlayAndEncode by lazy { OverlayAndEncode() }
+    private val overlayAndEncodeDelegate = lazy { OverlayAndEncode() }
+    private val overlayAndEncode by overlayAndEncodeDelegate
     private val gifToWebP by lazy { GifToWebP() }
     private val scope = CoroutineScope(
         Dispatchers.Main + SupervisorJob()
@@ -221,6 +222,10 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         super.onDestroy()
         if (cropAndScaleDelegate.isInitialized()) cropAndScale.release()
+        // Cancelling the encode also releases the native WebP encoder it holds:
+        // the connector keeps that state in one static pointer, so leaving it
+        // behind would make every later conversion fail.
+        if (overlayAndEncodeDelegate.isInitialized()) overlayAndEncode.release()
         scope.cancel()
     }
 }

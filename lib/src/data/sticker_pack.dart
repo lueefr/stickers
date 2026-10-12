@@ -29,11 +29,22 @@ class StickerPack {
     ImageEditorOption scale = ImageEditorOption();
     scale.addOption(const ScaleOption(96, 96));
     scale.outputFormat = const OutputFormat.png();
-    File? trayIconFile = await ImageEditor.editFileImageAndGetFile(
+    final File? scaledTray = await ImageEditor.editFileImageAndGetFile(
       file: File(trayIcon ?? stickers.first.source),
       imageEditorOption: scale,
     );
-    trayIconFile = await trayIconFile!.rename("$packsDir/$id/tray.png");
+    if (scaledTray == null) {
+      throw Exception("Could not prepare the tray image for WhatsApp");
+    }
+    // The tray icon has to live next to the stickers: WhatsApp reads it through
+    // the content provider, which serves files by their path. The directory can
+    // be missing when every other file of the pack was removed, and copying is
+    // more forgiving than renaming onto an existing file.
+    final directory = Directory("$packsDir/$id");
+    if (!await directory.exists()) await directory.create(recursive: true);
+    final File trayIconFile = await scaledTray.copy("$packsDir/$id/tray.png");
+    // The scaled image is only a temporary file in the cache directory.
+    if (await scaledTray.exists()) await scaledTray.delete();
 
     var stickerPack = WhatsappStickers(
       identifier: id,

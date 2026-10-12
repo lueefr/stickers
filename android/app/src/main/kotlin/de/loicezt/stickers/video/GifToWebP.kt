@@ -30,6 +30,8 @@ class GifToWebP {
         val dy = (OUTPUT_DIMENSION - height * scale) / 2f
 
         val bitmap = Bitmap.createBitmap(OUTPUT_DIMENSION, OUTPUT_DIMENSION, Bitmap.Config.ARGB_8888)
+        // Whether the native encoder was initialized and still needs releasing.
+        var encoderInitialized = false
         try {
             val canvas = Canvas(bitmap)
             val buffer = ByteBuffer.allocateDirect(OUTPUT_DIMENSION * OUTPUT_DIMENSION * 4)
@@ -38,6 +40,7 @@ class GifToWebP {
             if (!encoder.nativeInitEncoder(OUTPUT_DIMENSION, OUTPUT_DIMENSION, config)) {
                 throw IllegalStateException("Could not initialize WebP encoder")
             }
+            encoderInitialized = true
 
             var timestampMs = 0
             while (timestampMs < duration) {
@@ -58,15 +61,16 @@ class GifToWebP {
 
             val data = encoder.nativeReleaseEncoder()
                 ?: throw IllegalStateException("Could not assemble animated WebP")
+            encoderInitialized = false
             outputFile.writeBytes(data)
         } finally {
             bitmap.recycle()
             // The native encoder keeps its state in a single static pointer, so a
             // failure that leaves it behind would make every later encode (of a
-            // GIF or of a video) fail until the process restarts. Releasing it is
-            // safe even when it was never initialized: the native side guards
-            // against a null state.
-            LibWebP().nativeReleaseEncoder()
+            // GIF or of a video) fail until the process restarts. Only the release
+            // of an encoder this conversion initialized is safe: the video
+            // encoder shares the same pointer.
+            runCatching { if (encoderInitialized) LibWebP().nativeReleaseEncoder() }
         }
     }
 }
