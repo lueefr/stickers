@@ -114,6 +114,8 @@ class OverlayAndEncode {
         val webpEncoder = LibWebP()
         var webpData: ByteArray? = null
         var overlayBitmap: Bitmap? = null
+        // Whether the native encoder was initialized and still needs releasing.
+        var encoderInitialized = false
 
         return withContext(Dispatchers.IO) {
             try {
@@ -137,8 +139,12 @@ class OverlayAndEncode {
                 } else {
                     30
                 }
-                val targetFrameRate = maxFps.let { min(it, originalFrameRate) } ?: originalFrameRate
-                val totalFrames = ((durationUs / 1_000_000.0) * targetFrameRate).toInt()
+                // The Dart side lowers the frame rate to shrink the output. A zero
+                // would make the frame interval below a division by zero and
+                // produce an empty animation, so it is clamped to one frame per
+                // second at the very least.
+                val targetFrameRate = min(maxFps, originalFrameRate).coerceAtLeast(1)
+                val totalFrames = ((durationUs / 1_000_000.0) * targetFrameRate).toInt().coerceAtLeast(0)
                 _progress.value = ProgressState(totalFrames = totalFrames)
 
                 val webpBytes = overlayFile.readBytes()
@@ -156,7 +162,10 @@ class OverlayAndEncode {
                 overlayBitmap.copyPixelsFromBuffer(pixelBufferForOverlay)
 
                 glProcessor.setup(OUTPUT_DIMENSION, OUTPUT_DIMENSION, videoWidth, videoHeight)
-                webpEncoder.nativeInitEncoder(OUTPUT_DIMENSION, OUTPUT_DIMENSION, config)
+                if (!webpEncoder.nativeInitEncoder(OUTPUT_DIMENSION, OUTPUT_DIMENSION, config)) {
+                    throw IllegalStateException("Could not initialize the WebP encoder.")
+                }
+                encoderInitialized = true
 
                 decoder = MediaCodec.createDecoderByType(inputFormat.getString(MediaFormat.KEY_MIME)!!)
                 decoder.configure(inputFormat, glProcessor.decoderInputSurface, null, 0)
@@ -233,11 +242,20 @@ class OverlayAndEncode {
                     }
                 }
                 webpData = webpEncoder.nativeReleaseEncoder()
+                encoderInitialized = false
             } finally {
-                extractor.release()
-                decoder?.stop(); decoder?.release()
-                glProcessor.release()
-                overlayBitmap?.recycle()
+                // A failed or cancelled conversion must not leave the encoder
+                // behind: the connector keeps its state in a single static
+                // pointer, so a leftover state makes every later GIF and video
+                // conversion fail until the process restarts.
+                if (encoderInitialized) runCatching { webpEncoder.nativeReleaseEncoder() }
+                // Guard every cleanup call as well, so a throwing decoder can't
+                // skip the release of the GL context and the bitmap.
+                runCatching { extractor.release() }
+                runCatching { decoder?.stop() }
+                runCatching { decoder?.release() }
+                runCatching { glProcessor.release() }
+                runCatching { overlayBitmap?.recycle() }
             }
             webpData
         }

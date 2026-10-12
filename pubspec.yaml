@@ -43,7 +43,11 @@ dependencies:
   whatsapp_stickers_plus:
     git:
       url: https://github.com/lolocomotive/whatsapp_stickers_plus
-      ref: c435f986166c5734b1d64561307cad619814f531
+      # 36ab4b7 gives WhatsApp short file names for the tray icon and stickers
+      # (long names made it reject the pack with
+      # "handleStickerPackPreviewResult/failed") and fixes a double reply crash
+      # in onActivityResult that closed the app while adding a pack.
+      ref: 36ab4b7268e0e607fe9c57b8959c7c1a1b6c06f8
   flutter_archive:
     git:
       url: https://github.com/lolocomotive/flutter_archive

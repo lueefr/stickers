@@ -578,24 +578,28 @@ else if (videoController != null)
         );
         await service.start(
             videoFile: _source.path, overlayFile: out.path, outputFile: output.path, config: config, fps: fps);
+        var failed = false;
         await for (final update in service.progressStream) {
           if (update.status == Status.success) {
             break;
           } else if (update.status == Status.running) {
             _exportProgress.value = update.progress;
-          } else if (update.status == Status.failed) {
-            if (context.mounted) {
-              showDialog(
-                context: context,
-                builder: (context) {
-                  return ErrorDialog(
-                    title: AppLocalizations.of(context)!.exportWebpFailed,
-                    message: AppLocalizations.of(context)!.exportWebpFailedMsg,
-                  );
-                },
-              );
-            }
+          } else if (update.status == Status.failed || update.status == Status.cancelled) {
+            // The native side stops sending updates once a conversion ends, so
+            // waiting for a success here would hang the export forever. Report
+            // the attempt as failed and let the next one try a smaller sticker.
+            debugPrint("Export attempt ${attempt + 1} ended with ${update.status.name}");
+            failed = true;
+            break;
           }
+        }
+        if (failed) {
+          // Lowering the quality and the frame rate gives the encoder less work,
+          // so a later attempt can still succeed.
+          quality -= 20;
+          fps = max(1, (fps / 2).round());
+          debugPrint("New configuration: q=$quality fps=$fps");
+          continue;
         }
         debugPrint("Exported WebP in ${sw.elapsedMilliseconds}ms");
         data = await output.readAsBytes();
@@ -609,10 +613,16 @@ else if (videoController != null)
             fps = (fps / (data.lengthInBytes / 1024) * 550).round();
           }
           quality -= 20;
+          // The frame rate must never reach zero: the native encoder computes the
+          // frame interval as 1000000 / fps, and a zero aborts the conversion.
+          if (fps < 1) fps = 1;
           debugPrint("New configuration: q=$quality fps=$fps");
         }
       }
-      if (data!.lengthInBytes / 1024 > 500) {
+      if (data == null) {
+        throw Exception("The video could not be converted to a sticker");
+      }
+      if (data.lengthInBytes / 1024 > 500) {
         if (!context.mounted) throw Exception();
         Navigator.of(context).pop();
         showDialog(
