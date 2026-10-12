@@ -275,11 +275,19 @@ jobs:
                   unique.append(line)
           for line in unique[:40]:
               annotate(line)
-          # The flow traces say the most and are the ones a failure is about;
-          # the app's own debug output is not worth an annotation.
-          traced = [line for line in prints if 'flow:' in line or 'round ' in line]
-          for line in (traced or prints)[:25]:
-              annotate(line, limit=900)
+          # A failure report says the most, the flow traces say what the test
+          # did, and the app's own debug output is not worth an annotation.
+          def rank(line):
+              if 'EXCEPTION' in line or 'TestFailure' in line or 'Expected:' in line:
+                  return 0
+              if 'flow:' in line or 'round ' in line:
+                  return 1
+              if 'Clearing media cache' in line:
+                  return 3
+              return 2
+
+          for line in sorted(prints, key=rank)[:30]:
+              annotate(line, limit=1200)
           for name in failed[:10]:
               annotate('failed: ' + str(name))
           annotate(summary)

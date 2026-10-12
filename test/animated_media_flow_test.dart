@@ -121,6 +121,12 @@ void main() {
         'media=[$media] page=${find.text('new pack page').evaluate().isNotEmpty}';
   }
 
+  /// Whether the notice that ends a GIF flow is on screen.
+  ///
+  /// The messenger shows it in every Scaffold registered with it (the pack page
+  /// and a page pushed on top of it), so "on screen" means at least one copy.
+  bool noticeShown(String text) => find.textContaining(text, skipOffstage: false).evaluate().isNotEmpty;
+
   /// Fails with the message the flow itself reported when an error dialog is on
   /// screen: "nothing was added" then says why instead of leaving the test to
   /// guess.
@@ -260,14 +266,11 @@ void main() {
     await confirmCreatePackDialog(tester, title: 'GIF pack');
     final added = await pumpUntil(
       tester,
-      () => packs.last.stickers.isNotEmpty,
+      () => packs.last.stickers.isNotEmpty && noticeShown('Sticker ready'),
       trace: () => flowTrace(tester, conversions: conversions),
     );
     expect(added, isTrue, reason: 'the GIF becomes a sticker: ${flowTrace(tester, conversions: conversions)}');
     expectNoFlowError(tester);
-    // The pack the sticker went to is opened once the flow is done with it.
-    await pumpUntil(tester, () => find.text('new pack page').evaluate().isNotEmpty);
-    await settle(tester);
     print('flow: ${flowTrace(tester, conversions: conversions)}');
 
     expect(sources.gifPicks, 1);
@@ -277,13 +280,15 @@ void main() {
     expect(created.stickers, hasLength(1), reason: 'the GIF became a sticker of the new pack');
     expect(File(created.stickers.single.source).existsSync(), isTrue);
     expect(pack.stickers, hasLength(1), reason: 'the static pack is left untouched');
-    expect(find.text('new pack page'), findsOneWidget, reason: 'the pack the sticker went to is shown');
-    // The user has to know that only part of the GIF fitted the limit. The
-    // messenger shows the notice in every Scaffold that is registered with it
-    // (the pack page and the page that was just pushed on top), so more than
-    // one copy of the text can be in the tree.
+    // The user has to know that only part of the GIF fitted the limit. It is
+    // checked before the notice runs out (it lives for a few seconds).
     expect(find.textContaining('Sticker ready', skipOffstage: false), findsWidgets);
     expect(find.textContaining('first 10 seconds of the GIF', skipOffstage: false), findsWidgets);
+    // The pack the sticker went to is opened once the flow is done with it.
+    await pumpUntil(tester, () => find.text('new pack page').evaluate().isNotEmpty);
+    expect(find.text('new pack page'), findsOneWidget, reason: 'the pack the sticker went to is shown');
+    // Let the notice run out so the test does not end with its timer pending.
+    await settle(tester);
   });
 
   testWidgets('an animated pack converts a GIF into its own slot', (tester) async {
@@ -318,19 +323,20 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     final replaced = await pumpUntil(
       tester,
-      () => animated.stickers.single.source != stickerFile.path,
+      () => animated.stickers.single.source != stickerFile.path && noticeShown('Sticker ready'),
       trace: () => flowTrace(tester, conversions: conversions),
     );
     expect(replaced, isTrue, reason: 'the GIF replaces the sticker: ${flowTrace(tester, conversions: conversions)}');
     expectNoFlowError(tester);
-    await settle(tester);
     print('flow: ${flowTrace(tester, conversions: conversions)}');
 
     expect(packs, hasLength(1));
     expect(animated.stickers, hasLength(1), reason: 'the sticker is replaced, not appended');
     expect(File(animated.stickers.single.source).existsSync(), isTrue);
-    // A GIF inside the limit is not reported as cut.
+    // A GIF inside the limit is not reported as cut, and the flow still says it
+    // is done. As above: checked while the notice is on screen.
     expect(find.textContaining('fit WhatsApp', skipOffstage: false), findsNothing);
     expect(find.textContaining('Sticker ready', skipOffstage: false), findsWidgets);
+    await settle(tester);
   });
 }
