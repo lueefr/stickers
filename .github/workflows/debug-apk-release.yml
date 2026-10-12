@@ -193,7 +193,9 @@ jobs:
         shell: bash
         run: |
           set +e
-          flutter test 2>&1 | tee test.log
+          # Machine readable on purpose: the failure text can then be surfaced
+          # as annotations even when the run log itself cannot be downloaded.
+          flutter test --reporter=json 2>&1 | tee test.json
           exit "${PIPESTATUS[0]}"
 
       - name: Upload test diagnostics
@@ -201,7 +203,9 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: flutter-test-diagnostics-${{ github.run_id }}
-          path: test.log
+          path: |
+            test.json
+            test.log
           if-no-files-found: error
           retention-days: 7
 
@@ -210,31 +214,61 @@ jobs:
         shell: bash
         run: |
           python3 - <<'PY'
+          import json
           from pathlib import Path
 
           # The runner log and the artifact above can be out of reach when a
-          # network blocks the storage they live on. The failures are therefore
-          # also echoed as annotations: for every failing test the report the
-          # reporter printed around it (expected/actual values included).
-          log = Path('test.log')
-          if not log.exists():
-              print('::error::flutter test produced no log')
+          # network blocks the storage they live on. The reported failures are
+          # therefore echoed as annotations, and turned into a readable log for
+          # the artifact. The suite runs with the machine readable reporter, so
+          # the failure text comes through exactly instead of being guessed at
+          # from the pretty output.
+          raw = Path('test.json')
+          if not raw.exists():
+              print('::error::flutter test produced no report')
               raise SystemExit(0)
-          lines = log.read_text(errors='replace').splitlines()
+          names = {}
+          failures = []
+          prints = []
+          summary = 'flutter test produced no summary'
+          for line in raw.read_text(errors='replace').splitlines():
+              line = line.strip()
+              if not line.startswith('{'):
+                  continue
+              try:
+                  event = json.loads(line)
+              except ValueError:
+                  continue
+              kind = event.get('type')
+              if kind == 'testStart':
+                  test = event.get('test') or {}
+                  names[test.get('id')] = test.get('name', 'unknown test')
+              elif kind == 'error':
+                  failures.append((names.get(event.get('testID'), 'unknown test'), event.get('error', '')))
+              elif kind == 'print':
+                  prints.append(str(names.get(event.get('testID'), 'unknown test')) + ': ' + str(event.get('message', '')))
+              elif kind == 'done':
+                  summary = 'flutter test finished, success=%s, time=%sms' % (event.get('success'), event.get('time'))
 
           def annotate(text, limit=1400):
-              message = ' '.join(text.split())
+              message = ' '.join(str(text).split())
               message = message.replace('%', '%25').replace('\r', '%0D')
-              print(f'::error::{message[:limit]}')
+              print('::error::' + message[:limit])
 
-          # The expanded reporter prints the exception report just before the
-          # group whose header names the failing test.
-          headers = [i for i, line in enumerate(lines) if '::group::' in line and '❌' in line]
-          for index in headers[:10]:
-              annotate(' '.join(lines[max(0, index - 60):index]))
-              annotate(lines[index].replace('::group::', '').strip())
-          if not headers:
-              annotate(' '.join(lines[-60:]))
+          for name, error in failures[:20]:
+              annotate('%s: %s' % (name, error))
+          if not failures:
+              annotate('no failure event in the report; last lines: ' + ' '.join(prints[-10:]))
+          annotate(summary)
+
+          log = [summary, '']
+          for name, error in failures:
+              log.append('FAILED ' + name)
+              log.append(str(error))
+              log.append('')
+          log.extend(prints)
+          Path('test.log').write_text('\n'.join(log))
+          print(summary)
           PY
 
       - name: Fail on test failures
@@ -309,6 +343,7 @@ jobs:
           name: performance-diagnostics-${{ github.run_id }}
           path: |
             analyze.log
+            test.json
             test.log
             build-apk.log
             build/apk-report.json

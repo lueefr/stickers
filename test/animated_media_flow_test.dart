@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stickers/generated/intl/app_localizations.dart';
 import 'package:stickers/src/constants.dart';
+import 'package:stickers/src/dialogs/error_dialog.dart';
 import 'package:stickers/src/data/sticker.dart';
 import 'package:stickers/src/data/sticker_pack.dart';
 import 'package:stickers/src/globals.dart';
@@ -89,6 +90,18 @@ void main() {
     for (var round = 0; round < 10; round++) {
       await tester.pump(const Duration(milliseconds: 100));
     }
+  }
+
+  /// Fails with the message the flow itself reported when an error dialog is on
+  /// screen: "nothing was added" then says why instead of leaving the test to
+  /// guess.
+  void expectNoFlowError(WidgetTester tester) {
+    final dialog = find.byType(ErrorDialog);
+    if (dialog.evaluate().isEmpty) {
+      expect(dialog, findsNothing);
+      return;
+    }
+    fail('the flow reported an error: ${tester.widget<ErrorDialog>(dialog).message}');
   }
 
   /// Opens the "new sticker" sheet of the pack page by tapping the empty cell.
@@ -213,6 +226,7 @@ void main() {
     await tester.pumpAndSettle();
     await confirmCreatePackDialog(tester, title: 'GIF pack');
     await settleFlow(tester);
+    expectNoFlowError(tester);
 
     expect(sources.gifPicks, 1);
     expect(packs, hasLength(2));
@@ -255,6 +269,7 @@ void main() {
     await tester.tap(find.text('GIF'));
     await tester.pumpAndSettle();
     await settleFlow(tester);
+    expectNoFlowError(tester);
 
     expect(packs, hasLength(1));
     expect(animated.stickers, hasLength(1), reason: 'the sticker is replaced, not appended');
