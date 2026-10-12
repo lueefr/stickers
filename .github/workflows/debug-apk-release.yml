@@ -230,6 +230,7 @@ jobs:
 
           names = {}
           failed = []
+          prints = []
           summary = 'flutter test produced no summary'
           plain = []
           for line in raw.read_text(errors='replace').splitlines():
@@ -250,6 +251,10 @@ jobs:
                   names[test.get('id')] = test.get('name', 'unknown test')
               elif kind == 'error':
                   failed.append(names.get(event.get('testID'), 'unknown test'))
+              elif kind == 'print':
+                  # What the tests print is the only part of the run that can be
+                  # read back, so it is surfaced as well.
+                  prints.append(str(names.get(event.get('testID'), 'unknown test')) + ': ' + str(event.get('message', '')))
               elif kind == 'done':
                   summary = 'flutter test finished, success=%s, time=%sms' % (event.get('success'), event.get('time'))
 
@@ -270,6 +275,8 @@ jobs:
                   unique.append(line)
           for line in unique[:40]:
               annotate(line)
+          for line in prints[:20]:
+              annotate(line, limit=900)
           for name in failed[:10]:
               annotate('failed: ' + str(name))
           annotate(summary)
@@ -280,6 +287,9 @@ jobs:
           log.append('')
           log.append('REPORTER OUTPUT')
           log.extend(plain)
+          log.append('')
+          log.append('TEST OUTPUT')
+          log.extend(prints)
           Path('test.log').write_text('\n'.join(log))
           print(summary)
           PY

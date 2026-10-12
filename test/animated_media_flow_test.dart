@@ -104,6 +104,19 @@ void main() {
     fail('the flow reported an error: ${tester.widget<ErrorDialog>(dialog).message}');
   }
 
+  /// Prints what a flow left behind. A widget test that fails here is
+  /// otherwise a black box: the only output of a CI run is what the tests print
+  /// or assert on.
+  void reportFlow(WidgetTester tester, {required int conversions}) {
+    final dialog = find.byType(ErrorDialog);
+    final message = dialog.evaluate().isEmpty ? 'none' : tester.widget<ErrorDialog>(dialog).message;
+    final texts = tester.widgetList<Text>(find.byType(Text)).map((text) => text.data).whereType<String>();
+    print('flow: conversions=$conversions errorDialog=$message '
+        'stickers=${packs.map((entry) => entry.stickers.length).toList()} '
+        'dir=${Directory('$packsDir/${packs.last.id}').existsSync()} '
+        'texts=${texts.take(24).join(' | ')}');
+  }
+
   /// Opens the "new sticker" sheet of the pack page by tapping the empty cell.
   Future<void> openNewStickerSheet(WidgetTester tester) async {
     await tester.tap(find.byIcon(Icons.add));
@@ -200,9 +213,11 @@ void main() {
     StickerMediaSources.instance = sources;
     // The native GIF converter writes the animated WebP and answers with the
     // length of the source GIF (12s here, i.e. longer than WhatsApp allows).
+    var conversions = 0;
     const channel = MethodChannel('de.loicezt.stickers/methods');
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
       if (call.method != 'convertGif') return null;
+      conversions++;
       final args = call.arguments as Map<Object?, Object?>;
       expect(args['maxDurationMs'], 10 * 1000, reason: 'the native side is told the limit too');
       await File(args['outputFile']! as String).writeAsBytes(base64Decode(_kPng1x1));
@@ -226,6 +241,7 @@ void main() {
     await tester.pumpAndSettle();
     await confirmCreatePackDialog(tester, title: 'GIF pack');
     await settleFlow(tester);
+    reportFlow(tester, conversions: conversions);
     expectNoFlowError(tester);
 
     expect(sources.gifPicks, 1);
@@ -246,9 +262,11 @@ void main() {
     final animated = StickerPack('test pack', 'author', 'pack_test', [Sticker(stickerFile.path, ['❤'])], '1', true);
     packs = [animated];
     StickerMediaSources.instance = _FakeMediaSources(gifPath: gifPath);
+    var conversions = 0;
     const channel = MethodChannel('de.loicezt.stickers/methods');
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
       if (call.method != 'convertGif') return null;
+      conversions++;
       final args = call.arguments as Map<Object?, Object?>;
       await File(args['outputFile']! as String).writeAsBytes(base64Decode(_kPng1x1));
       return 3000;
@@ -269,6 +287,7 @@ void main() {
     await tester.tap(find.text('GIF'));
     await tester.pumpAndSettle();
     await settleFlow(tester);
+    reportFlow(tester, conversions: conversions);
     expectNoFlowError(tester);
 
     expect(packs, hasLength(1));
