@@ -192,5 +192,27 @@
     }
   },
   "updateCheckFailed": "Couldn't check for updates",
-  "updateCheckFailedMessage": "Check your internet connection and try again."
+  "updateCheckFailedMessage": "Check your internet connection and try again.",
+  "newImage": "New image",
+  "multipleImages": "Multiple images",
+  "multipleImagesHint": "Edit them one at a time",
+  "startWithExistingSticker": "Start with existing sticker",
+  "video": "Video",
+  "gif": "GIF",
+  "videoHint": "Trim, crop and rotate",
+  "gifHint": "Create an animated sticker from a GIF",
+  "animatedStickerDurationLimit": "WhatsApp only accepts animated stickers of up to {seconds} seconds, so a longer video uses its first {seconds} seconds.",
+  "@animatedStickerDurationLimit": {
+    "placeholders": {
+      "seconds": {"type": "int"}
+    }
+  },
+  "gifTrimmedToLimit": "Only the first {seconds} seconds of the GIF fit WhatsApp's limit, so the sticker was cut. ",
+  "@gifTrimmedToLimit": {
+    "placeholders": {
+      "seconds": {"type": "int"}
+    }
+  },
+  "animatedStickerReadyToSend": "Sticker ready. Add the pack to WhatsApp to use it.",
+  "creatingAnimatedSticker": "Creating animated sticker..."
 }

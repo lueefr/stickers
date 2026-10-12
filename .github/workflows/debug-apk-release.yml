@@ -186,7 +186,128 @@ jobs:
         run: exit 1
 
       - name: Run tests
-        run: flutter test
+        id: test
+        # Failures stay non-fatal for one step so the diagnostics below can be
+        # surfaced as annotations; the step after them fails the job.
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          # Machine readable on purpose: the failure text can then be surfaced
+          # as annotations even when the run log itself cannot be downloaded.
+          flutter test --reporter=json 2>&1 | tee test.json
+          exit "${PIPESTATUS[0]}"
+
+      - name: Upload test diagnostics
+        if: steps.test.outcome == 'failure'
+        uses: actions/upload-artifact@v5
+        with:
+          name: flutter-test-diagnostics-${{ github.run_id }}
+          path: |
+            test.json
+            test.log
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Surface test diagnostics
+        if: steps.test.outcome == 'failure'
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          # The runner log and the artifact above can be out of reach when a
+          # network blocks the storage they live on. The failures are therefore
+          # also echoed as annotations, and turned into a readable log for the
+          # artifact. The machine readable reporter is used because most of the
+          # pretty output is widget dumps; its failure details are the plain
+          # lines it writes around the report.
+          raw = Path('test.json')
+          if not raw.exists():
+              print('::error::flutter test produced no report')
+              raise SystemExit(0)
+
+          names = {}
+          failed = []
+          prints = []
+          summary = 'flutter test produced no summary'
+          plain = []
+          for line in raw.read_text(errors='replace').splitlines():
+              stripped = line.strip()
+              if not stripped.startswith('{'):
+                  # The reporter's own account of the failures, with the values
+                  # the expectations saw and the stack traces.
+                  if stripped and not set(stripped) <= set('\u2500\u2501\u2550- '):
+                      plain.append(stripped[:400])
+                  continue
+              try:
+                  event = json.loads(stripped)
+              except ValueError:
+                  continue
+              kind = event.get('type')
+              if kind == 'testStart':
+                  test = event.get('test') or {}
+                  names[test.get('id')] = test.get('name', 'unknown test')
+              elif kind == 'error':
+                  failed.append(names.get(event.get('testID'), 'unknown test'))
+              elif kind == 'print':
+                  # What the tests print is the only part of the run that can be
+                  # read back, so it is surfaced as well.
+                  prints.append(str(names.get(event.get('testID'), 'unknown test')) + ': ' + str(event.get('message', '')))
+              elif kind == 'done':
+                  summary = 'flutter test finished, success=%s, time=%sms' % (event.get('success'), event.get('time'))
+
+          def annotate(text, limit=1400):
+              message = ' '.join(str(text).split())
+              message = message.replace('%', '%25').replace('\r', '%0D')
+              print('::error::' + message[:limit])
+
+          details = []
+          for index, line in enumerate(plain):
+              if any(marker in line for marker in ('Expected:', 'Actual:', 'Which:', 'was thrown', 'EXCEPTION', 'Exception', 'Error:', 'reported an error')):
+                  details.extend(plain[max(0, index - 2):index + 4])
+          seen = set()
+          unique = []
+          for line in details:
+              if line not in seen:
+                  seen.add(line)
+                  unique.append(line)
+          for line in unique[:40]:
+              annotate(line)
+          # A failure report says the most, the flow traces say what the test
+          # did, and the app's own debug output is not worth an annotation.
+          def rank(line):
+              if 'EXCEPTION' in line or 'TestFailure' in line or 'Expected:' in line:
+                  return 0
+              if 'flow:' in line or 'round ' in line:
+                  return 1
+              if 'Clearing media cache' in line:
+                  return 3
+              return 2
+
+          for line in sorted(prints, key=rank)[:30]:
+              annotate(line, limit=1200)
+          for name in failed[:10]:
+              annotate('failed: ' + str(name))
+          annotate(summary)
+
+          log = [summary, '']
+          log.append('FAILED TESTS')
+          log.extend('  ' + str(name) for name in failed)
+          log.append('')
+          log.append('REPORTER OUTPUT')
+          log.extend(plain)
+          log.append('')
+          log.append('TEST OUTPUT')
+          log.extend(prints)
+          Path('test.log').write_text('\n'.join(log))
+          print(summary)
+          PY
+
+      - name: Fail on test failures
+        if: steps.test.outcome == 'failure'
+        run: exit 1
 
       - name: Build optimized community APKs
         shell: bash
@@ -256,6 +377,7 @@ jobs:
           name: performance-diagnostics-${{ github.run_id }}
           path: |
             analyze.log
+            test.json
             build-apk.log
             build/apk-report.json
             build/pubspec.lock

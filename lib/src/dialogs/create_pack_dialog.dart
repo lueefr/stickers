@@ -5,9 +5,16 @@ import 'package:stickers/src/data/sticker_pack.dart';
 import 'package:stickers/src/util.dart';
 
 class CreatePackDialog extends StatefulWidget {
-  const CreatePackDialog(this.packs, {super.key});
+  const CreatePackDialog(this.packs, {super.key, this.initialAnimated = false});
 
   final List<StickerPack> packs;
+
+  /// Whether the dialog starts on "Animated" instead of "Static".
+  ///
+  /// Used by the flows that already know the kind of pack they need (a video or
+  /// a GIF sticker can only live in an animated pack), so the user does not have
+  /// to pick it and cannot pick an incompatible one by accident.
+  final bool initialAnimated;
 
   @override
   State<CreatePackDialog> createState() => _CreatePackDialogState();
@@ -20,7 +27,7 @@ class _CreatePackDialogState extends State<CreatePackDialog> {
 
   final _formKey = GlobalKey<FormState>();
 
-  bool _animated = false;
+  late bool _animated = widget.initialAnimated;
 
   @override
   Widget build(BuildContext context) {
@@ -96,15 +103,20 @@ class _CreatePackDialogState extends State<CreatePackDialog> {
         ElevatedButton(
           onPressed: () {
             if (!_formKey.currentState!.validate()) return;
-            widget.packs.add(StickerPack(
+            final pack = StickerPack(
               _nameController.text,
               _authorController.text,
               "pack_${DateTime.now().millisecondsSinceEpoch}",
               [],
               "0",
               _animated,
-            ));
-            Navigator.of(context).pop();
+            );
+            widget.packs.add(pack);
+            // The new pack is returned as well, so a caller that needs to keep
+            // working with it (the video/GIF flows) does not have to search for
+            // it in the list. Callers that ignore the result keep working
+            // exactly as before.
+            Navigator.of(context).pop(pack);
           },
           child: Text(AppLocalizations.of(context)!.add),
         ),

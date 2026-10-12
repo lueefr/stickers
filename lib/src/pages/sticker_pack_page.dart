@@ -1,14 +1,15 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:stickers/generated/intl/app_localizations.dart';
 import 'package:stickers/src/constants.dart';
 import 'package:stickers/src/data/load_store.dart';
 import 'package:stickers/src/data/sticker_pack.dart';
+import 'package:stickers/src/dialogs/create_pack_dialog.dart';
 import 'package:stickers/src/dialogs/delete_confirm_dialog.dart';
 import 'package:stickers/src/dialogs/edit_pack_dialog.dart';
 import 'package:stickers/src/dialogs/edit_sticker_dialog.dart';
@@ -17,9 +18,12 @@ import 'package:stickers/src/dialogs/select_sticker_dialog.dart';
 import 'package:stickers/src/globals.dart';
 import 'package:stickers/src/pages/crop_page.dart';
 import 'package:stickers/src/pages/default_page.dart';
+import 'package:stickers/src/video/common.dart';
 import 'package:stickers/src/video/gif_to_webp.dart';
+import 'package:stickers/src/video/media_sources.dart';
 import 'package:stickers/src/util.dart';
 import 'package:stickers/src/widgets/sticker_thumbnail.dart';
+import 'package:stickers/src/widgets/toast.dart';
 
 class StickerPackPage extends StatefulWidget {
   final StickerPack pack;
@@ -245,71 +249,133 @@ class StickerPackPageState extends State<StickerPackPage> {
   }
 
   Future<void> _showStaticStickerOptions(int index) async {
+    final l10n = AppLocalizations.of(context)!;
+    // isScrollControlled + a scroll view: this sheet holds five entries and the
+    // default sheet is capped at 9/16 of the screen, which overflows on a short
+    // screen. The entries stay reachable instead of being clipped.
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo),
-              title: Text("New image"),
-              onTap: () {
-                Navigator.of(context).pop();
-                _pickAndEditSingleImage(index);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.collections),
-              title: Text("Multiple images"),
-              subtitle: Text("Edit them one at a time"),
-              onTap: () {
-                Navigator.of(context).pop();
-                _pickAndEditMultipleImages();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.auto_fix_high),
-              title: Text("Start with existing sticker"),
-              onTap: () {
-                Navigator.of(context).pop();
-                _startWithExistingSticker();
-              },
-            ),
-          ],
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo),
+                title: Text(l10n.newImage),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAndEditSingleImage(index);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.collections),
+                title: Text(l10n.multipleImages),
+                subtitle: Text(l10n.multipleImagesHint),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAndEditMultipleImages();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.auto_fix_high),
+                title: Text(l10n.startWithExistingSticker),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _startWithExistingSticker();
+                },
+              ),
+              const Divider(height: 1),
+              // A static pack cannot hold video or GIF stickers: WhatsApp only
+              // accepts media of the kind the pack was created for, and it
+              // refuses the whole pack otherwise. The sources are offered here
+              // anyway so a video or a GIF can be turned into a sticker without
+              // the user having to know that it needs an animated pack.
+              ListTile(
+                leading: const Icon(Icons.video_library),
+                title: Text(l10n.video),
+                subtitle: Text(l10n.videoHint),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _createAnimatedPackFor(_pickAndEditVideo);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.gif_box),
+                title: Text(l10n.gif),
+                subtitle: Text(l10n.gifHint),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _createAnimatedPackFor(_pickGif);
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
+  /// Asks for the animated pack a video or a GIF sticker has to live in and
+  /// runs [start] on it.
+  ///
+  /// WhatsApp refuses a pack that mixes static and animated stickers, so a
+  /// video or a GIF picked from a static pack cannot be added to it. Instead of
+  /// hiding those sources (the video/GIF flows then looked broken) the app asks
+  /// for the animated pack that will hold the sticker, and the new pack is shown
+  /// when the sticker is in it.
+  Future<void> _createAnimatedPackFor(Future<void> Function(StickerPack pack, int index) start) async {
+    final created = await showDialog<StickerPack?>(
+      context: context,
+      builder: (context) => CreatePackDialog(packs, initialAnimated: true),
+    );
+    if (created == null || !mounted) return;
+    // Persist the new pack right away: adding the sticker saves the packs
+    // again, but the user can also cancel the picker and still keep the pack.
+    await savePacks(packs);
+    await start(created, 0);
+    if (!mounted) return;
+    setState(() {});
+    if (created.stickers.isEmpty) return;
+    // The sticker went to a pack the user is not looking at: show it, so the
+    // result of the flow is visible.
+    await Navigator.of(context).pushNamed("/pack", arguments: created);
+    if (mounted) setState(() {});
+  }
+
   Future<void> _showAnimatedStickerOptions(int index) async {
+    final l10n = AppLocalizations.of(context)!;
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.video_library),
-              title: Text("Video"),
-              subtitle: Text("Trim, crop and rotate"),
-              onTap: () {
-                Navigator.of(context).pop();
-                _pickAndEditVideo(index);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.gif_box),
-              title: Text("GIF"),
-              subtitle: Text("Create an animated sticker from a GIF"),
-              onTap: () {
-                Navigator.of(context).pop();
-                _pickGif(index);
-              },
-            ),
-          ],
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.video_library),
+                title: Text(l10n.video),
+                subtitle: Text(l10n.videoHint),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAndEditVideo(widget.pack, index);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.gif_box),
+                title: Text(l10n.gif),
+                subtitle: Text(l10n.gifHint),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickGif(widget.pack, index);
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -381,47 +447,72 @@ class StickerPackPageState extends State<StickerPackPage> {
     );
   }
 
-  Future<void> _pickAndEditVideo(int index) async {
+  /// Lets the user pick a video and trim it into the sticker slot [index] of
+  /// [pack].
+  ///
+  /// The pack is a parameter (and not always [widget.pack]) because a video
+  /// can also be picked from a static pack, in which case the caller first
+  /// creates the animated pack that will hold the sticker.
+  Future<void> _pickAndEditVideo(StickerPack pack, int index) async {
     try {
-      final ImagePicker picker = ImagePicker();
-      final XFile? video = await picker.pickVideo(source: ImageSource.gallery);
-      if (video == null) return;
+      final String? videoPath = await StickerMediaSources.instance.pickVideo();
+      if (videoPath == null) return;
       if (!mounted) return;
-      Navigator.pushNamed(
+      await Navigator.pushNamed(
         context,
         "/crop_video",
         arguments: EditArguments(
-          pack: widget.pack,
+          pack: pack,
           index: index,
-          mediaPath: video.path,
+          mediaPath: videoPath,
+          // The video and the GIF flows end in their own editor, which pops
+          // itself; this page must stay on the stack until they are done.
+          popCount: 0,
         ),
-      ).then((value) => setState(() {}));
+      );
+      if (mounted) setState(() {});
     } on Exception catch (e) {
       _showLoadError(e);
     }
   }
 
-  Future<void> _pickGif(int index) async {
+  /// Lets the user pick a GIF and converts it into the sticker slot [index] of
+  /// [pack].
+  ///
+  /// The pack is a parameter for the same reason as in [_pickAndEditVideo].
+  Future<void> _pickGif(StickerPack pack, int index) async {
+    // Context of the blocking progress dialog, so it can be dismissed by
+    // closing the dialog itself. Popping whatever route happens to be on top
+    // would close this page instead when the dialog never made it to screen
+    // (this page is a pushed route as well).
+    BuildContext? progressDialogContext;
+    void dismissProgressDialog() {
+      final dialogContext = progressDialogContext;
+      progressDialogContext = null;
+      if (dialogContext == null || !dialogContext.mounted) return;
+      Navigator.of(dialogContext).pop();
+    }
+
     try {
-      final file = await FilePicker.pickFile(
-        type: FileType.custom,
-        allowedExtensions: ["gif"],
-      );
-      if (file == null || file.path == null) return;
+      final String? gifPath = await StickerMediaSources.instance.pickGif();
+      if (gifPath == null) return;
       if (!mounted) return;
-      showDialog(
+      unawaited(showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (_) => AlertDialog(
-          content: Row(
-            children: [
-              const CircularProgressIndicator(),
-              const SizedBox(width: 20),
-              Expanded(child: Text("Creating animated sticker...")),
-            ],
-          ),
-        ),
-      );
+        builder: (dialogContext) {
+          progressDialogContext = dialogContext;
+          return AlertDialog(
+            content: Row(
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(width: 20),
+                Expanded(child: Text(AppLocalizations.of(context)!.creatingAnimatedSticker)),
+              ],
+            ),
+          );
+        },
+      ));
       // The cache directory can be wiped by the OS at any time without the app
       // restarting, so make sure it is there before writing into it.
       await ensureMediaCacheDir();
@@ -429,24 +520,31 @@ class StickerPackPageState extends State<StickerPackPage> {
       Uint8List? best;
       double quality = 60;
       int fps = 12;
+      // Length of the GIF itself. A GIF longer than WhatsApp's limit is cut to
+      // it by the converter (a longer sticker would make WhatsApp refuse the
+      // pack), and the user is told that only a part of it became a sticker.
+      var sourceDurationMs = 0;
       for (var attempt = 0; attempt < 3; attempt++) {
         final output = "$mediaCacheDir/gif_${DateTime.now().millisecondsSinceEpoch}_$attempt.webp";
-        await service.convert(
-          inputFile: file.path!,
+        final reportedDurationMs = await service.convert(
+          inputFile: gifPath,
           outputFile: output,
           quality: quality,
           fps: fps,
         );
+        if (sourceDurationMs == 0 && reportedDurationMs > 0) sourceDurationMs = reportedDurationMs;
         final data = await File(output).readAsBytes();
         best = data;
-        if (data.lengthInBytes / 1024 < 500) break;
+        // WhatsApp's own limit for an animated sticker.
+        if (data.lengthInBytes <= maxAnimatedStickerBytes) break;
         quality -= 20;
         fps = max<int>(6, (fps * .75).round());
       }
+      // Dismiss the progress dialog: the conversion (not the page) is done.
+      dismissProgressDialog();
       if (!mounted) return;
-      Navigator.of(context).pop();
       if (best == null) return;
-      if (best.lengthInBytes / 1024 > 500) {
+      if (best.lengthInBytes > maxAnimatedStickerBytes) {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
@@ -459,13 +557,17 @@ class StickerPackPageState extends State<StickerPackPage> {
         );
         return;
       }
-      await addToPack(widget.pack, index, best);
+      await addToPack(pack, index, best);
       if (!mounted) return;
       setState(() {});
+      final l10n = AppLocalizations.of(context)!;
+      final prefix = sourceDurationMs > maxAnimatedStickerDurationMs
+          ? l10n.gifTrimmedToLimit(maxAnimatedStickerDurationMs ~/ 1000)
+          : "";
+      showToast("$prefix${l10n.animatedStickerReadyToSend}");
     } on Exception catch (e) {
-      if (mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
-      }
+      // Only the progress dialog may be closed here; this page has to stay.
+      dismissProgressDialog();
       _showLoadError(e);
     }
   }

@@ -7,20 +7,41 @@ import android.graphics.Movie
 import java.io.File
 import java.nio.ByteBuffer
 import kotlin.math.max
+import kotlin.math.min
 
 class GifToWebP {
     companion object {
         private const val OUTPUT_DIMENSION = 512
+
+        /** WhatsApp refuses an animated sticker longer than ten seconds. */
+        const val MAX_ANIMATED_DURATION_MS = 10_000
     }
 
-    fun convert(inputFile: File, outputFile: File, config: WebPConfig, fps: Int) {
+    /**
+     * Converts a GIF into an animated WebP and returns the length of the
+     * source GIF in milliseconds.
+     *
+     * The animation stops after [maxDurationMs] (WhatsApp's limit for an
+     * animated sticker): together with the caller's own check this is a safety
+     * net, so a longer GIF is cut instead of producing a sticker that makes
+     * WhatsApp reject the whole pack. The returned length lets the caller tell
+     * whether only a part of the GIF became the sticker.
+     */
+    fun convert(
+        inputFile: File,
+        outputFile: File,
+        config: WebPConfig,
+        fps: Int,
+        maxDurationMs: Int = MAX_ANIMATED_DURATION_MS
+    ): Int {
         val gifBytes = inputFile.readBytes()
         val movie = Movie.decodeByteArray(gifBytes, 0, gifBytes.size)
             ?: throw IllegalArgumentException("Could not decode GIF")
 
         val width = if (movie.width() > 0) movie.width() else OUTPUT_DIMENSION
         val height = if (movie.height() > 0) movie.height() else OUTPUT_DIMENSION
-        val duration = if (movie.duration() > 0) movie.duration() else 1000
+        val sourceDurationMs = if (movie.duration() > 0) movie.duration() else 1000
+        val duration = min(sourceDurationMs, max(1, maxDurationMs))
         val frameIntervalMs = max(1, 1000 / max(1, fps))
         val scale = max(
             OUTPUT_DIMENSION.toFloat() / width.toFloat(),
@@ -72,5 +93,8 @@ class GifToWebP {
             // encoder shares the same pointer.
             runCatching { if (encoderInitialized) LibWebP().nativeReleaseEncoder() }
         }
+        // Reported to the caller so it can tell the user when only the first
+        // seconds of a longer GIF became the sticker.
+        return sourceDurationMs
     }
 }
