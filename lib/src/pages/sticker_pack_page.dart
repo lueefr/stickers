@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
@@ -480,28 +481,38 @@ class StickerPackPageState extends State<StickerPackPage> {
   ///
   /// The pack is a parameter for the same reason as in [_pickAndEditVideo].
   Future<void> _pickGif(StickerPack pack, int index) async {
-    // Whether the blocking progress dialog is on screen and still has to be
-    // dismissed. It is tracked explicitly: popping "the top route" after a
-    // failure would otherwise close this very page (it is a pushed route too).
-    var progressShown = false;
+    // Context of the blocking progress dialog, so it can be dismissed by
+    // closing the dialog itself. Popping whatever route happens to be on top
+    // would close this page instead when the dialog never made it to screen
+    // (this page is a pushed route as well).
+    BuildContext? progressDialogContext;
+    void dismissProgressDialog() {
+      final dialogContext = progressDialogContext;
+      progressDialogContext = null;
+      if (dialogContext == null || !dialogContext.mounted) return;
+      Navigator.of(dialogContext).pop();
+    }
+
     try {
       final String? gifPath = await StickerMediaSources.instance.pickGif();
       if (gifPath == null) return;
       if (!mounted) return;
-      showDialog(
+      unawaited(showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (_) => AlertDialog(
-          content: Row(
-            children: [
-              const CircularProgressIndicator(),
-              const SizedBox(width: 20),
-              Expanded(child: Text(AppLocalizations.of(context)!.creatingAnimatedSticker)),
-            ],
-          ),
-        ),
-      );
-      progressShown = true;
+        builder: (dialogContext) {
+          progressDialogContext = dialogContext;
+          return AlertDialog(
+            content: Row(
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(width: 20),
+                Expanded(child: Text(AppLocalizations.of(context)!.creatingAnimatedSticker)),
+              ],
+            ),
+          );
+        },
+      ));
       // The cache directory can be wiped by the OS at any time without the app
       // restarting, so make sure it is there before writing into it.
       await ensureMediaCacheDir();
@@ -529,12 +540,9 @@ class StickerPackPageState extends State<StickerPackPage> {
         quality -= 20;
         fps = max<int>(6, (fps * .75).round());
       }
-      if (!mounted) return;
       // Dismiss the progress dialog: the conversion (not the page) is done.
-      if (progressShown) {
-        progressShown = false;
-        Navigator.of(context, rootNavigator: true).pop();
-      }
+      dismissProgressDialog();
+      if (!mounted) return;
       if (best == null) return;
       if (best.lengthInBytes > maxAnimatedStickerBytes) {
         showDialog(
@@ -559,10 +567,7 @@ class StickerPackPageState extends State<StickerPackPage> {
       showToast("$prefix${l10n.animatedStickerReadyToSend}");
     } on Exception catch (e) {
       // Only the progress dialog may be closed here; this page has to stay.
-      if (mounted && progressShown) {
-        progressShown = false;
-        Navigator.of(context, rootNavigator: true).pop();
-      }
+      dismissProgressDialog();
       _showLoadError(e);
     }
   }
