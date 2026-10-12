@@ -212,29 +212,35 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          # The runner log is also uploaded above. Echo the failures as
-          # annotations so they remain inspectable when a log download is
-          # unavailable from a restricted network. Only the failing tests and
-          # their stack traces are kept: a passing run prints one line per test.
+          # The runner log and the artifact above can be out of reach when a
+          # network blocks the storage they live on. The failures are therefore
+          # also echoed as annotations: the report that precedes a failing
+          # test's group and the group itself, exception text included.
           log = Path('test.log')
           if not log.exists():
               print('::error::flutter test produced no log')
               raise SystemExit(0)
           lines = log.read_text(errors='replace').splitlines()
-          markers = ('[E]', 'Expected:', 'Actual:', 'Which:', 'Error:', 'failed', 'Exception')
-          emitted = 0
-          for number, line in enumerate(lines, 1):
-              if not any(marker in line for marker in markers):
+
+          def annotate(text):
+              message = ' '.join(text.split())
+              message = message.replace('%', '%25').replace('\r', '%0D')
+              print(f'::error::{message[:900]}')
+
+          # The expanded reporter prints the exception report, then a group
+          # whose header names the failing test (the stack trace follows it).
+          reported = 0
+          for index, line in enumerate(lines):
+              if '::group::' not in line or '❌' not in line:
                   continue
-              message = line.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
-              print(f'::error file=test.log,line={number}::{message}')
-              emitted += 1
-              if emitted >= 100:
+              reported += 1
+              annotate(' '.join(lines[max(0, index - 25):index]))
+              annotate(line.replace('::group::', '').strip())
+              if reported >= 10:
                   break
-          if emitted == 0:
-              for number, line in enumerate(lines[-60:], len(lines) - 59):
-                  message = line.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
-                  print(f'::error file=test.log,line={number}::{message}')
+          if reported == 0:
+              for line in lines[-40:]:
+                  annotate(line)
           PY
 
       - name: Fail on test failures
