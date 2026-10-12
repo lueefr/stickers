@@ -71,25 +71,54 @@ void main() {
     );
   }
 
-  /// Advances a flow that does both kinds of work.
+  /// Advances a flow that does both kinds of work until [done] holds.
   ///
   /// The widget test clock is fake, so the page's own continuations need a
   /// pump, while the file I/O of saving a pack and the mocked platform channel
   /// of the converter need the real event loop ([WidgetTester.runAsync]).
-  /// Alternating the two lets a flow run to its end.
-  Future<void> settleFlow(WidgetTester tester) async {
-    for (var round = 0; round < 12; round++) {
-      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
+  /// Alternating the two lets a flow run to its end; the trace says what the
+  /// flow was doing when it did not get there.
+  Future<bool> pumpUntil(
+    WidgetTester tester,
+    bool Function() done, {
+    int rounds = 200,
+    String Function()? trace,
+  }) async {
+    for (var round = 0; round < rounds; round++) {
+      if (round % 25 == 0) {
+        final line = trace?.call();
+        if (line != null) print('round $round: $line');
+      }
+      if (done()) return true;
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 10)));
       await tester.pump(const Duration(milliseconds: 50));
     }
-    // Let a notice that was just shown run out, so the test does not end with
-    // its timer still pending. Bounded pumps instead of pumpAndSettle: a flow
-    // that did not finish would otherwise only time out (a running progress
-    // indicator never settles), which hides the real failure.
+    return done();
+  }
+
+  /// Lets whatever was just shown run out, so the test does not end with a
+  /// pending timer (the notice that says the sticker is ready, for example).
+  ///
+  /// Bounded pumps instead of [WidgetTester.pumpAndSettle]: the flow shows a
+  /// progress indicator while it converts, and an animation that never ends
+  /// only makes the settle time out, hiding the real state.
+  Future<void> settle(WidgetTester tester) async {
     await tester.pump(const Duration(seconds: 6));
     for (var round = 0; round < 10; round++) {
       await tester.pump(const Duration(milliseconds: 100));
     }
+  }
+
+  /// What a flow has done so far. Reported when it did not get where the test
+  /// wanted it: a widget test that fails here is otherwise a black box.
+  String flowTrace(WidgetTester tester, {int conversions = 0}) {
+    final dialog = find.byType(ErrorDialog);
+    final error = dialog.evaluate().isEmpty ? 'none' : tester.widget<ErrorDialog>(dialog).message;
+    final cache = Directory(mediaCacheDir);
+    final media = cache.existsSync() ? cache.listSync().map((entry) => entry.path.split('/').last).join(',') : 'missing';
+    return 'conversions=$conversions dialogs=${find.byType(AlertDialog).evaluate().length} '
+        'error=$error stickers=${packs.map((entry) => entry.stickers.length).toList()} '
+        'media=[$media] page=${find.text('new pack page').evaluate().isNotEmpty}';
   }
 
   /// Fails with the message the flow itself reported when an error dialog is on
@@ -97,24 +126,8 @@ void main() {
   /// guess.
   void expectNoFlowError(WidgetTester tester) {
     final dialog = find.byType(ErrorDialog);
-    if (dialog.evaluate().isEmpty) {
-      expect(dialog, findsNothing);
-      return;
-    }
+    if (dialog.evaluate().isEmpty) return;
     fail('the flow reported an error: ${tester.widget<ErrorDialog>(dialog).message}');
-  }
-
-  /// Prints what a flow left behind. A widget test that fails here is
-  /// otherwise a black box: the only output of a CI run is what the tests print
-  /// or assert on.
-  void reportFlow(WidgetTester tester, {required int conversions}) {
-    final dialog = find.byType(ErrorDialog);
-    final message = dialog.evaluate().isEmpty ? 'none' : tester.widget<ErrorDialog>(dialog).message;
-    final texts = tester.widgetList<Text>(find.byType(Text)).map((text) => text.data).whereType<String>();
-    print('flow: conversions=$conversions errorDialog=$message '
-        'stickers=${packs.map((entry) => entry.stickers.length).toList()} '
-        'dir=${Directory('$packsDir/${packs.last.id}').existsSync()} '
-        'texts=${texts.take(24).join(' | ')}');
   }
 
   /// Opens the "new sticker" sheet of the pack page by tapping the empty cell.
@@ -170,7 +183,9 @@ void main() {
     await tester.pumpAndSettle();
 
     await confirmCreatePackDialog(tester);
-    await settleFlow(tester);
+    final trimmed = await pumpUntil(tester, () => find.text('trim page').evaluate().isNotEmpty);
+    expect(trimmed, isTrue, reason: 'the trimmer opens: ${flowTrace(tester)}');
+    await settle(tester);
 
     expect(packs, hasLength(2), reason: 'the user asked for a new pack and got one');
     final created = packs.last;
@@ -238,11 +253,22 @@ void main() {
 
     await openNewStickerSheet(tester);
     await tester.tap(find.text('GIF'));
-    await tester.pumpAndSettle();
+    // Only bounded pumps here: the flow shows a progress indicator while it
+    // converts, so settling on it would never return.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
     await confirmCreatePackDialog(tester, title: 'GIF pack');
-    await settleFlow(tester);
-    reportFlow(tester, conversions: conversions);
+    final added = await pumpUntil(
+      tester,
+      () => packs.last.stickers.isNotEmpty,
+      trace: () => flowTrace(tester, conversions: conversions),
+    );
+    expect(added, isTrue, reason: 'the GIF becomes a sticker: ${flowTrace(tester, conversions: conversions)}');
     expectNoFlowError(tester);
+    // The pack the sticker went to is opened once the flow is done with it.
+    await pumpUntil(tester, () => find.text('new pack page').evaluate().isNotEmpty);
+    await settle(tester);
+    print('flow: ${flowTrace(tester, conversions: conversions)}');
 
     expect(sources.gifPicks, 1);
     expect(packs, hasLength(2));
@@ -285,10 +311,17 @@ void main() {
     await tester.tap(find.text('Replace'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('GIF'));
-    await tester.pumpAndSettle();
-    await settleFlow(tester);
-    reportFlow(tester, conversions: conversions);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    final replaced = await pumpUntil(
+      tester,
+      () => animated.stickers.single.source != stickerFile.path,
+      trace: () => flowTrace(tester, conversions: conversions),
+    );
+    expect(replaced, isTrue, reason: 'the GIF replaces the sticker: ${flowTrace(tester, conversions: conversions)}');
     expectNoFlowError(tester);
+    await settle(tester);
+    print('flow: ${flowTrace(tester, conversions: conversions)}');
 
     expect(packs, hasLength(1));
     expect(animated.stickers, hasLength(1), reason: 'the sticker is replaced, not appended');
