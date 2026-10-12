@@ -135,7 +135,7 @@
   "couldntExportPacks": "Could not export sticker packs",
   "tryExportAgain": "Please try exporting the packs again.",
   "checkForUpdates": "Check for updates",
-  "checkForUpdatesDescription": "Get the newest APK from GitHub",
+  "checkForUpdatesDescription": "Download and install the latest version directly in the app",
   "checkingForUpdates": "Checking for updates...",
   "updateAvailable": "Update available",
   "updateAvailableMessage": "Version {latestVersion} is available. Installed version: {currentVersion}.",
@@ -148,6 +148,42 @@
   "releaseNotes": "What's new",
   "later": "Later",
   "downloadUpdate": "Download update",
+  "downloadingUpdate": "Downloading update...",
+  "downloadingUpdateMessage": "Downloading version {version}",
+  "@downloadingUpdateMessage": {
+    "placeholders": {
+      "version": {"type": "String"}
+    }
+  },
+  "updateDownloadProgress": "{received} of {total} ({percentage}%)",
+  "@updateDownloadProgress": {
+    "placeholders": {
+      "received": {"type": "String"},
+      "total": {"type": "String"},
+      "percentage": {"type": "String"}
+    }
+  },
+  "updateDownloadBytesReceived": "{received} downloaded",
+  "@updateDownloadBytesReceived": {
+    "placeholders": {
+      "received": {"type": "String"}
+    }
+  },
+  "updateDownloadComplete": "Download complete",
+  "updateDownloadedMessage": "Version {version} is ready to install.",
+  "@updateDownloadedMessage": {
+    "placeholders": {
+      "version": {"type": "String"}
+    }
+  },
+  "installUpdate": "Install",
+  "preparingUpdateInstaller": "Opening the Android installer...",
+  "updateApkUnavailable": "There is no compatible APK attached to this release, so it can't be installed from the app.",
+  "updateDownloadFailed": "Couldn't download the update",
+  "updateDownloadFailedMessage": "Check your internet connection and try again.",
+  "updateInstallFailedMessage": "The APK was downloaded, but Android couldn't open the installer. Check installation permissions in Android settings and try again.",
+  "updateInstallPermissionDeniedMessage": "Allow Stickers to install unknown apps in Android settings, then try again.",
+  "retry": "Try again",
   "appIsUpToDate": "App is up to date",
   "appIsUpToDateMessage": "You already have the newest version ({currentVersion}).",
   "@appIsUpToDateMessage": {
@@ -156,6 +192,5 @@
     }
   },
   "updateCheckFailed": "Couldn't check for updates",
-  "updateCheckFailedMessage": "Check your internet connection and try again.",
-  "couldntOpenUpdate": "Couldn't open the APK download. Open the GitHub repository and download the latest release manually."
+  "updateCheckFailedMessage": "Check your internet connection and try again."
 }

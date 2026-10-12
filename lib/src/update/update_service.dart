@@ -80,8 +80,6 @@ class UpdateRelease {
       ? tagName.substring(1)
       : tagName;
 
-  /// Downloads the APK directly when one exists, otherwise opens the release page.
-  Uri get updateUrl => apkDownloadUrl ?? releaseUrl;
 }
 
 class UpdateCheckException implements Exception {
