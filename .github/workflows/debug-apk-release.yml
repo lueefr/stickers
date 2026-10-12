@@ -186,7 +186,60 @@ jobs:
         run: exit 1
 
       - name: Run tests
-        run: flutter test
+        id: test
+        # Failures stay non-fatal for one step so the diagnostics below can be
+        # surfaced as annotations; the step after them fails the job.
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          flutter test 2>&1 | tee test.log
+          exit "${PIPESTATUS[0]}"
+
+      - name: Upload test diagnostics
+        if: steps.test.outcome == 'failure'
+        uses: actions/upload-artifact@v5
+        with:
+          name: flutter-test-diagnostics-${{ github.run_id }}
+          path: test.log
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Surface test diagnostics
+        if: steps.test.outcome == 'failure'
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          # The runner log is also uploaded above. Echo the failures as
+          # annotations so they remain inspectable when a log download is
+          # unavailable from a restricted network. Only the failing tests and
+          # their stack traces are kept: a passing run prints one line per test.
+          log = Path('test.log')
+          if not log.exists():
+              print('::error::flutter test produced no log')
+              raise SystemExit(0)
+          lines = log.read_text(errors='replace').splitlines()
+          markers = ('[E]', 'Expected:', 'Actual:', 'Which:', 'Error:', 'failed', 'Exception')
+          emitted = 0
+          for number, line in enumerate(lines, 1):
+              if not any(marker in line for marker in markers):
+                  continue
+              message = line.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+              print(f'::error file=test.log,line={number}::{message}')
+              emitted += 1
+              if emitted >= 100:
+                  break
+          if emitted == 0:
+              for number, line in enumerate(lines[-60:], len(lines) - 59):
+                  message = line.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+                  print(f'::error file=test.log,line={number}::{message}')
+          PY
+
+      - name: Fail on test failures
+        if: steps.test.outcome == 'failure'
+        run: exit 1
 
       - name: Build optimized community APKs
         shell: bash
@@ -256,6 +309,7 @@ jobs:
           name: performance-diagnostics-${{ github.run_id }}
           path: |
             analyze.log
+            test.log
             build-apk.log
             build/apk-report.json
             build/pubspec.lock
