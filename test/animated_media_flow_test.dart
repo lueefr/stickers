@@ -278,9 +278,12 @@ void main() {
     expect(File(created.stickers.single.source).existsSync(), isTrue);
     expect(pack.stickers, hasLength(1), reason: 'the static pack is left untouched');
     expect(find.text('new pack page'), findsOneWidget, reason: 'the pack the sticker went to is shown');
-    // The user has to know that only part of the GIF fitted the limit.
-    expect(find.textContaining('Sticker ready', skipOffstage: false), findsOneWidget);
-    expect(find.textContaining('first 10 seconds of the GIF', skipOffstage: false), findsOneWidget);
+    // The user has to know that only part of the GIF fitted the limit. The
+    // messenger shows the notice in every Scaffold that is registered with it
+    // (the pack page and the page that was just pushed on top), so more than
+    // one copy of the text can be in the tree.
+    expect(find.textContaining('Sticker ready', skipOffstage: false), findsWidgets);
+    expect(find.textContaining('first 10 seconds of the GIF', skipOffstage: false), findsWidgets);
   });
 
   testWidgets('an animated pack converts a GIF into its own slot', (tester) async {
@@ -328,6 +331,6 @@ void main() {
     expect(File(animated.stickers.single.source).existsSync(), isTrue);
     // A GIF inside the limit is not reported as cut.
     expect(find.textContaining('fit WhatsApp', skipOffstage: false), findsNothing);
-    expect(find.textContaining('Sticker ready', skipOffstage: false), findsOneWidget);
+    expect(find.textContaining('Sticker ready', skipOffstage: false), findsWidgets);
   });
 }
