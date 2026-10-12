@@ -4,7 +4,7 @@ description: "A minimal WhatsApp sticker maker"
 # Prevent accidental publishing to pub.dev.
 publish_to: 'none'
 
-version: 1.6.3+31
+version: 1.6.4+32
 environment:
   sdk: '>=3.9.0 <4.0.0'
 
