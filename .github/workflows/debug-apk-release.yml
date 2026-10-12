@@ -378,7 +378,6 @@ jobs:
           path: |
             analyze.log
             test.json
-            test.log
             build-apk.log
             build/apk-report.json
             build/pubspec.lock
