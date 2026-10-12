@@ -218,25 +218,30 @@ jobs:
           from pathlib import Path
 
           # The runner log and the artifact above can be out of reach when a
-          # network blocks the storage they live on. The reported failures are
-          # therefore echoed as annotations, and turned into a readable log for
-          # the artifact. The suite runs with the machine readable reporter, so
-          # the failure text comes through exactly instead of being guessed at
-          # from the pretty output.
+          # network blocks the storage they live on. The failures are therefore
+          # also echoed as annotations, and turned into a readable log for the
+          # artifact. The machine readable reporter is used because most of the
+          # pretty output is widget dumps; its failure details are the plain
+          # lines it writes around the report.
           raw = Path('test.json')
           if not raw.exists():
               print('::error::flutter test produced no report')
               raise SystemExit(0)
+
           names = {}
-          failures = []
-          prints = []
+          failed = []
           summary = 'flutter test produced no summary'
+          plain = []
           for line in raw.read_text(errors='replace').splitlines():
-              line = line.strip()
-              if not line.startswith('{'):
+              stripped = line.strip()
+              if not stripped.startswith('{'):
+                  # The reporter's own account of the failures, with the values
+                  # the expectations saw and the stack traces.
+                  if stripped and not set(stripped) <= set('\u2500\u2501\u2550- '):
+                      plain.append(stripped[:400])
                   continue
               try:
-                  event = json.loads(line)
+                  event = json.loads(stripped)
               except ValueError:
                   continue
               kind = event.get('type')
@@ -244,9 +249,7 @@ jobs:
                   test = event.get('test') or {}
                   names[test.get('id')] = test.get('name', 'unknown test')
               elif kind == 'error':
-                  failures.append((names.get(event.get('testID'), 'unknown test'), event.get('error', '')))
-              elif kind == 'print':
-                  prints.append(str(names.get(event.get('testID'), 'unknown test')) + ': ' + str(event.get('message', '')))
+                  failed.append(names.get(event.get('testID'), 'unknown test'))
               elif kind == 'done':
                   summary = 'flutter test finished, success=%s, time=%sms' % (event.get('success'), event.get('time'))
 
@@ -255,18 +258,28 @@ jobs:
               message = message.replace('%', '%25').replace('\r', '%0D')
               print('::error::' + message[:limit])
 
-          for name, error in failures[:20]:
-              annotate('%s: %s' % (name, error))
-          if not failures:
-              annotate('no failure event in the report; last lines: ' + ' '.join(prints[-10:]))
+          details = []
+          for index, line in enumerate(plain):
+              if any(marker in line for marker in ('Expected:', 'Actual:', 'Which:', 'was thrown', 'EXCEPTION', 'Exception', 'Error:', 'reported an error')):
+                  details.extend(plain[max(0, index - 2):index + 4])
+          seen = set()
+          unique = []
+          for line in details:
+              if line not in seen:
+                  seen.add(line)
+                  unique.append(line)
+          for line in unique[:40]:
+              annotate(line)
+          for name in failed[:10]:
+              annotate('failed: ' + str(name))
           annotate(summary)
 
           log = [summary, '']
-          for name, error in failures:
-              log.append('FAILED ' + name)
-              log.append(str(error))
-              log.append('')
-          log.extend(prints)
+          log.append('FAILED TESTS')
+          log.extend('  ' + str(name) for name in failed)
+          log.append('')
+          log.append('REPORTER OUTPUT')
+          log.extend(plain)
           Path('test.log').write_text('\n'.join(log))
           print(summary)
           PY
