@@ -66,7 +66,15 @@ class _VideoCropPageState extends State<VideoCropPage> {
     try {
       await _controller.initialize();
       if (!mounted) return;
-      setState(() => _ready = true);
+      // A sticker that lasts longer than WhatsApp's limit makes the pack it
+      // belongs to impossible to add, so the trimmer starts on a window that
+      // can still become a sticker.
+      final range = RangeValues(0, initialTrimEndFraction(_controller.value.duration));
+      setState(() {
+        _ready = true;
+        _range = range;
+      });
+      _rangeNotifier.value = range;
     } catch (e) {
       if (!mounted) return;
       await showDialog<void>(
@@ -265,6 +273,16 @@ class _VideoCropPageState extends State<VideoCropPage> {
                     ),
                   ],
                 ),
+                if (_ready && _controller.value.duration.inMilliseconds > maxAnimatedStickerDurationMs)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                    child: Text(
+                      AppLocalizations.of(context)!
+                          .animatedStickerDurationLimit(maxAnimatedStickerDurationMs ~/ 1000),
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(10, 8, 10, 16),
                   child: FilledButton(
@@ -298,17 +316,27 @@ class _VideoCropPageState extends State<VideoCropPage> {
   }
 
   void _onRangeChanged(RangeValues values) {
+    // WhatsApp refuses an animated sticker longer than ten seconds, so the
+    // window can never be longer than that: the dragged handle stops at the
+    // limit instead of producing a sticker that cannot be used.
+    final clamped = clampAnimatedTrimWindow(
+      start: values.start,
+      end: values.end,
+      videoDuration: _controller.value.duration,
+      movedEnd: values.end != _range.end,
+    );
+    final range = RangeValues(clamped.start, clamped.end);
     final Duration seekTarget;
-    if (_range.start != values.start) {
-      seekTarget = _controller.value.duration * values.start;
-    } else if (_range.end != values.end) {
-      seekTarget = _controller.value.duration * values.end;
+    if (_range.start != range.start) {
+      seekTarget = _controller.value.duration * range.start;
+    } else if (_range.end != range.end) {
+      seekTarget = _controller.value.duration * range.end;
     } else {
       return;
     }
     _requestSeek(seekTarget);
-    _range = values;
-    _rangeNotifier.value = values;
+    _range = range;
+    _rangeNotifier.value = range;
   }
 
   Future<void> _finishRangeEdit() async {
@@ -356,11 +384,17 @@ class _VideoCropPageState extends State<VideoCropPage> {
       // restarting, so make sure it is there before writing into it.
       await ensureMediaCacheDir();
       final output = "$mediaCacheDir/import_${DateTime.now().millisecondsSinceEpoch}.mp4";
+      // Safety net for a window that was restored from the slider state: a
+      // sticker longer than WhatsApp's limit would be refused with the whole
+      // pack, so only the allowed part is transcoded.
+      final videoDuration = _controller.value.duration;
+      final start = videoDuration * _range.start;
+      final end = start + clampAnimatedDuration(videoDuration * _range.end - start);
       await service.start(
         inputFile: widget.imagePath,
         outputFile: output,
-        start: _controller.value.duration * _range.start,
-        end: _controller.value.duration * _range.end,
+        start: start,
+        end: end,
         rotationDegrees: _rotationDegrees,
         cropToSquare: _cropToSquare,
       );

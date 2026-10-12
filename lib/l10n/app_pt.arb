@@ -189,5 +189,27 @@
     }
   },
   "updateCheckFailed": "Não foi possível verificar atualizações",
-  "updateCheckFailedMessage": "Confira sua conexão com a internet e tente novamente."
+  "updateCheckFailedMessage": "Confira sua conexão com a internet e tente novamente.",
+  "newImage": "Nova imagem",
+  "multipleImages": "Várias imagens",
+  "multipleImagesHint": "Edite uma de cada vez",
+  "startWithExistingSticker": "Começar com uma figurinha existente",
+  "video": "Vídeo",
+  "gif": "GIF",
+  "videoHint": "Cortar, recortar e girar",
+  "gifHint": "Criar uma figurinha animada a partir de um GIF",
+  "animatedStickerDurationLimit": "O WhatsApp só aceita figurinhas animadas de até {seconds} segundos, então um vídeo mais longo usa os primeiros {seconds} segundos.",
+  "@animatedStickerDurationLimit": {
+    "placeholders": {
+      "seconds": {"type": "int"}
+    }
+  },
+  "gifTrimmedToLimit": "Apenas os primeiros {seconds} segundos do GIF couberam no limite do WhatsApp, então a figurinha foi cortada. ",
+  "@gifTrimmedToLimit": {
+    "placeholders": {
+      "seconds": {"type": "int"}
+    }
+  },
+  "animatedStickerReadyToSend": "Figurinha pronta. Adicione o pacote ao WhatsApp para usá-la.",
+  "creatingAnimatedSticker": "Criando figurinha animada..."
 }

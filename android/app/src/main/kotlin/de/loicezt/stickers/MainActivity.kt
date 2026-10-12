@@ -112,11 +112,21 @@ class MainActivity : FlutterActivity() {
                             val inputFile = File(args["inputFile"]!! as String)
                             val outputFile = File(args["outputFile"]!! as String)
                             val fps = args["fps"]!! as Int
+                            // WhatsApp rejects an animated sticker longer than
+                            // ten seconds; older Flutter builds do not send the
+                            // limit, so it falls back to the same constant.
+                            val maxDurationMs =
+                                (args["maxDurationMs"] as? Number)?.toInt()
+                                    ?: GifToWebP.MAX_ANIMATED_DURATION_MS
                             val config = WebPConfig.fromMap(args["config"]!! as Map<*, *>)
-                            gifToWebP.convert(inputFile, outputFile, config, fps)
+                            // The length of the source GIF is reported back, so
+                            // the caller can tell the user when only a part of it
+                            // became the sticker.
+                            val sourceDurationMs =
+                                gifToWebP.convert(inputFile, outputFile, config, fps, maxDurationMs)
                             // The method channel result has to be delivered on the
                             // platform thread.
-                            withContext(Dispatchers.Main) { result.success(null) }
+                            withContext(Dispatchers.Main) { result.success(sourceDurationMs) }
                         } catch (e: Exception) {
                             withContext(Dispatchers.Main) {
                                 result.error("GIF_CONVERT_FAILED", e.message, null)

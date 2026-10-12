@@ -1,3 +1,95 @@
+// Limits WhatsApp enforces on every sticker of a pack, taken from its own
+// validator (StickerPackValidator in WhatsApp/stickers). One sticker that
+// breaks a rule makes WhatsApp refuse the whole pack, so a video or a GIF that
+// produces such a sticker can never be turned into a usable sticker until the
+// media is cut to fit.
+//
+// - an animated sticker lasts at most 10 seconds and is at most 500 KiB;
+// - no frame of it may be shorter than 8 ms (i.e. at most 125 fps);
+// - a tray image is at most 50 KiB and a static sticker at most 100 KiB.
+const int maxAnimatedStickerDurationMs = 10 * 1000;
+const int maxAnimatedStickerBytes = 500 * 1024;
+const int minAnimatedFrameDurationMs = 8;
+const int maxAnimatedStickerFrameRate = 1000 ~/ minAnimatedFrameDurationMs;
+
+/// [maxAnimatedStickerDurationMs] as a [Duration].
+const Duration maxAnimatedStickerDuration = Duration(milliseconds: maxAnimatedStickerDurationMs);
+
+/// Shortens [duration] to WhatsApp's [maxAnimatedStickerDuration].
+Duration clampAnimatedDuration(Duration duration) =>
+    duration > maxAnimatedStickerDuration ? maxAnimatedStickerDuration : duration;
+
+/// Fraction of a video the trimmer may select when it starts: the whole video,
+/// or only its first [maxAnimatedStickerDurationMs] when it is longer.
+///
+/// A sticker longer than that makes WhatsApp refuse the pack it belongs to, so
+/// the trimmer starts on a window that can actually become a sticker.
+double initialTrimEndFraction(Duration videoDuration) {
+  final int durationMs = videoDuration.inMilliseconds;
+  if (durationMs <= maxAnimatedStickerDurationMs) return 1;
+  return maxAnimatedStickerDurationMs / durationMs;
+}
+
+/// The part of a video an animated sticker is made of, as fractions of the
+/// video (0 is its start, 1 its end).
+class AnimatedTrimWindow {
+  const AnimatedTrimWindow({required this.start, required this.end});
+
+  final double start;
+  final double end;
+}
+
+/// Clamps a trim window, given as fractions ([start], [end]) of
+/// [videoDuration], to WhatsApp's animated sticker duration limit.
+///
+/// [movedEnd] says which handle the user is dragging: the window is shortened
+/// by pulling the *moved* handle back, so the other one stays where the user
+/// put it and the slider keeps following the finger until it hits the limit.
+AnimatedTrimWindow clampAnimatedTrimWindow({
+  required double start,
+  required double end,
+  required Duration videoDuration,
+  required bool movedEnd,
+}) {
+  final int durationMs = videoDuration.inMilliseconds;
+  // `num.clamp` does not guarantee a double, so the result is converted back:
+  // the window is handed to RangeSlider, which only takes doubles.
+  double windowStart = start.clamp(0.0, 1.0).toDouble();
+  double windowEnd = end.clamp(0.0, 1.0).toDouble();
+  if (windowEnd < windowStart) {
+    windowEnd = windowStart;
+  }
+  // Without a known length there is no fraction to compare with: leave the
+  // window alone and let the native side clamp what it transcodes.
+  if (durationMs <= maxAnimatedStickerDurationMs) {
+    return AnimatedTrimWindow(start: windowStart, end: windowEnd);
+  }
+
+  final double limit = maxAnimatedStickerDurationMs / durationMs;
+  if (windowEnd - windowStart <= limit) {
+    return AnimatedTrimWindow(start: windowStart, end: windowEnd);
+  }
+
+  if (movedEnd) {
+    // The end is the handle under the finger: it stops at the limit and the
+    // start stays where the user put it.
+    windowEnd = windowStart + limit;
+    if (windowEnd > 1) {
+      windowEnd = 1;
+      windowStart = 1 - limit;
+    }
+  } else {
+    // The start is the handle under the finger: it stops the limit short of
+    // the end, and only a start that would leave the video moves the end too.
+    windowStart = windowEnd - limit;
+    if (windowStart < 0) {
+      windowStart = 0;
+      windowEnd = limit;
+    }
+  }
+  return AnimatedTrimWindow(start: windowStart, end: windowEnd);
+}
+
 // Enums and classes to mirror the Kotlin side
 enum Status {
   idle,
