@@ -523,7 +523,10 @@ class StickerPackPageState extends State<StickerPackPage> {
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
-                      onPressed: () => Navigator.of(sheetContext).pop(fill),
+                      onPressed: () {
+                        debugPrint('Confirm GIF crop fill=$fill');
+                        Navigator.of(sheetContext).pop(fill);
+                      },
                       child: Text(l10n.done),
                     ),
                   ),
@@ -558,6 +561,7 @@ class StickerPackPageState extends State<StickerPackPage> {
       if (gifPath == null || !mounted) return;
       // GIFs have no video-trimming page; choose the square composition here.
       final cropToSquare = await _chooseGifCrop(gifPath);
+      debugPrint('GIF crop mode: $cropToSquare, page mounted: $mounted');
       if (cropToSquare == null || !mounted) return;
       unawaited(showDialog(
         context: context,

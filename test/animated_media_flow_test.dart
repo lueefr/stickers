@@ -272,6 +272,8 @@ void main() {
     expect(pickerShown, isTrue, reason: 'GIF crop choices must appear after creating the pack');
     await tester.tap(find.text('Done').last);
     await tester.pump();
+    final sheetClosed = await pumpUntil(tester, () => find.text('Crop animated GIF').evaluate().isEmpty);
+    expect(sheetClosed, isTrue, reason: 'confirming GIF crop must dismiss the modal');
     final added = await pumpUntil(
       tester,
       () => packs.last.stickers.isNotEmpty && noticeShown('Sticker ready'),
@@ -337,6 +339,8 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('Done').last);
     await tester.pump();
+    final sheetClosed = await pumpUntil(tester, () => find.text('Crop animated GIF').evaluate().isEmpty);
+    expect(sheetClosed, isTrue, reason: 'confirming GIF crop must dismiss the modal');
     final replaced = await pumpUntil(
       tester,
       () => animated.stickers.single.source != stickerFile.path && noticeShown('Sticker ready'),
