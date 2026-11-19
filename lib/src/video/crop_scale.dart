@@ -11,11 +11,12 @@ class CropAndScaleService {
 
   // A stream controller to expose a single, unified progress stream
   final _progressController = StreamController<Progress>.broadcast();
+  late final StreamSubscription<dynamic> _nativeSubscription;
   Stream<Progress> get progressStream => _progressController.stream;
 
   CropAndScaleService() {
     // Listen to the native event channel as soon as the service is created
-    _eventChannel.receiveBroadcastStream().listen(_onProgress, onError: _onError);
+    _nativeSubscription = _eventChannel.receiveBroadcastStream().listen(_onProgress, onError: _onError);
   }
 
   void _onProgress(dynamic data) {
@@ -28,13 +29,13 @@ class CropAndScaleService {
         currentFrame: data['currentFrame'] as int? ?? 0,
         totalFrames: data['totalFrames'] as int? ?? 0,
       );
-      _progressController.add(progress);
+      if (!_progressController.isClosed) _progressController.add(progress);
     }
   }
 
   void _onError(Object error) {
     debugPrint("Error on EventChannel: $error");
-    _progressController.add(Progress(status: Status.failed));
+    if (!_progressController.isClosed) _progressController.add(Progress(status: Status.failed));
   }
 
   Future<void> start({
@@ -45,8 +46,7 @@ class CropAndScaleService {
     int rotationDegrees = 0,
     bool cropToSquare = true,
   }) async {
-    try {
-      await _methodChannel.invokeMethod('startTrim', {
+    await _methodChannel.invokeMethod<void>('startTrim', {
         'inputFile': inputFile,
         'outputFile': outputFile,
         'startTimeUs': start.inMicroseconds.toString(),
@@ -54,9 +54,6 @@ class CropAndScaleService {
         'rotationDegrees': rotationDegrees.toString(),
         'cropToSquare': cropToSquare.toString(),
       });
-    } on PlatformException catch (e) {
-      debugPrint("Failed to start transcoding: '${e.message}'.");
-    }
   }
 
   Future<void> cancel() async {
@@ -68,6 +65,7 @@ class CropAndScaleService {
   }
 
   void dispose() {
+    _nativeSubscription.cancel();
     _progressController.close();
   }
 }

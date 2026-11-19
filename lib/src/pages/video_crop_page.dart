@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
@@ -390,30 +391,34 @@ class _VideoCropPageState extends State<VideoCropPage> {
       final videoDuration = _controller.value.duration;
       final start = videoDuration * _range.start;
       final end = start + clampAnimatedDuration(videoDuration * _range.end - start);
-      await service.start(
-        inputFile: widget.imagePath,
-        outputFile: output,
-        start: start,
-        end: end,
-        rotationDegrees: _rotationDegrees,
-        cropToSquare: _cropToSquare,
-      );
-      await for (final s in service.progressStream) {
-        if (s.status == Status.success) {
-          break;
-        } else if (s.status == Status.failed) {
-          debugPrint("Transcoding failed!");
-          if (mounted) {
-            showDialog(
-              context: context,
-              builder: (context) => ErrorDialog(
-                title: AppLocalizations.of(context)!.trimFailed,
-                message: AppLocalizations.of(context)!.trimFailedMsg,
-              ),
-            );
-          }
-          throw Exception();
+      // Attach before starting the native job: fast failures otherwise race
+      // with the broadcast stream and leave the editor waiting forever.
+      final completion = Completer<Progress>();
+      final subscription = service.progressStream.listen((update) {
+        if ((update.status == Status.success || update.status == Status.failed ||
+                update.status == Status.cancelled) &&
+            !completion.isCompleted) {
+          completion.complete(update);
         }
+      });
+      try {
+        await service.start(
+          inputFile: widget.imagePath,
+          outputFile: output,
+          start: start,
+          end: end,
+          rotationDegrees: _rotationDegrees,
+          cropToSquare: _cropToSquare,
+        );
+        final result = await completion.future.timeout(const Duration(minutes: 3));
+        if (result.status != Status.success) {
+          throw StateError('Video transcoding ended with ${result.status.name}');
+        }
+        if (!await File(output).exists() || await File(output).length() == 0) {
+          throw StateError('Video transcoding produced no output');
+        }
+      } finally {
+        await subscription.cancel();
       }
       if (!mounted) return;
       Navigator.of(context).pushNamed(
@@ -425,6 +430,17 @@ class _VideoCropPageState extends State<VideoCropPage> {
           type: MediaType.video,
         ),
       );
+    } on Exception catch (e) {
+      debugPrint('Could not trim video: $e');
+      if (mounted) {
+        await showDialog<void>(
+          context: context,
+          builder: (context) => ErrorDialog(
+            title: AppLocalizations.of(context)!.trimFailed,
+            message: '${AppLocalizations.of(context)!.trimFailedMsg}\n\n$e',
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _exporting = false);
     }
