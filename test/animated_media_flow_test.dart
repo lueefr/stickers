@@ -265,7 +265,11 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     await confirmCreatePackDialog(tester, title: 'GIF pack');
-    await tester.pumpAndSettle();
+    final pickerShown = await pumpUntil(
+      tester,
+      () => find.text('Fill square').evaluate().isNotEmpty,
+    );
+    expect(pickerShown, isTrue, reason: 'GIF crop choices must appear after creating the pack');
     await tester.tap(find.text('Done').last);
     await tester.pump();
     final added = await pumpUntil(
@@ -324,7 +328,11 @@ void main() {
     await tester.tap(find.text('Replace'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('GIF'));
-    await tester.pumpAndSettle();
+    final pickerShown = await pumpUntil(
+      tester,
+      () => find.text('Fit whole frame').evaluate().isNotEmpty,
+    );
+    expect(pickerShown, isTrue, reason: 'GIF crop choices must appear before converting');
     await tester.tap(find.text('Fit whole frame'));
     await tester.pump();
     await tester.tap(find.text('Done').last);
