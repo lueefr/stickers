@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
@@ -576,32 +577,35 @@ else if (videoController != null)
           alphaCompression: 1,
           method: 4,
         );
-        await service.start(
-            videoFile: _source.path, overlayFile: out.path, outputFile: output.path, config: config, fps: fps);
-        var failed = false;
-        await for (final update in service.progressStream) {
-          if (update.status == Status.success) {
-            break;
-          } else if (update.status == Status.running) {
+        // Listen before the native call so a quick failure cannot be missed.
+        final completion = Completer<Progress>();
+        final subscription = service.progressStream.listen((update) {
+          if (update.status == Status.running) {
             _exportProgress.value = update.progress;
-          } else if (update.status == Status.failed || update.status == Status.cancelled) {
-            // The native side stops sending updates once a conversion ends, so
-            // waiting for a success here would hang the export forever. Report
-            // the attempt as failed and let the next one try a smaller sticker.
-            debugPrint("Export attempt ${attempt + 1} ended with ${update.status.name}");
-            failed = true;
-            break;
+          } else if ((update.status == Status.success || update.status == Status.failed ||
+                  update.status == Status.cancelled) &&
+              !completion.isCompleted) {
+            completion.complete(update);
           }
+        });
+        late final Progress result;
+        try {
+          await service.start(
+              videoFile: _source.path, overlayFile: out.path, outputFile: output.path, config: config, fps: fps);
+          result = await completion.future.timeout(const Duration(minutes: 3));
+        } finally {
+          await subscription.cancel();
         }
-        if (failed) {
-          // Lowering the quality and the frame rate gives the encoder less work,
-          // so a later attempt can still succeed.
+        if (result.status != Status.success) {
+          debugPrint("Export attempt ${attempt + 1} ended with ${result.status.name}");
           quality -= 20;
           fps = max(1, (fps / 2).round());
-          debugPrint("New configuration: q=$quality fps=$fps");
           continue;
         }
         debugPrint("Exported WebP in ${sw.elapsedMilliseconds}ms");
+        if (!await output.exists() || await output.length() == 0) {
+          throw StateError('Animated WebP encoder produced no output');
+        }
         data = await output.readAsBytes();
         debugPrint("Output size: ${data.lengthInBytes / 1024}kiB");
         if (data.lengthInBytes / 1024 < 500) {

@@ -476,6 +476,66 @@ class StickerPackPageState extends State<StickerPackPage> {
     }
   }
 
+
+  /// Shows the same fit/fill choice available for video, with a live preview.
+  Future<bool?> _chooseGifCrop(String path) async {
+    var fill = true;
+    final l10n = AppLocalizations.of(context)!;
+    return showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setMode) => SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(l10n.cropGifModeTitle, style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 10),
+                  SizedBox.square(
+                    dimension: 184,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: ColoredBox(
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        child: Image.file(
+                          File(path),
+                          fit: fill ? BoxFit.cover : BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) => const Icon(Icons.gif_box, size: 48),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SegmentedButton<bool>(
+                    showSelectedIcon: false,
+                    segments: [
+                      ButtonSegment(value: true, label: Text(l10n.cropFill), icon: const Icon(Icons.crop_square)),
+                      ButtonSegment(value: false, label: Text(l10n.cropFit), icon: const Icon(Icons.fit_screen)),
+                    ],
+                    selected: {fill},
+                    onSelectionChanged: (values) => setMode(() => fill = values.first),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () => Navigator.of(sheetContext).pop(fill),
+                      child: Text(l10n.done),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Lets the user pick a GIF and converts it into the sticker slot [index] of
   /// [pack].
   ///
@@ -495,8 +555,10 @@ class StickerPackPageState extends State<StickerPackPage> {
 
     try {
       final String? gifPath = await StickerMediaSources.instance.pickGif();
-      if (gifPath == null) return;
-      if (!mounted) return;
+      if (gifPath == null || !mounted) return;
+      // GIFs have no video-trimming page; choose the square composition here.
+      final cropToSquare = await _chooseGifCrop(gifPath);
+      if (cropToSquare == null || !mounted) return;
       unawaited(showDialog(
         context: context,
         barrierDismissible: false,
@@ -531,6 +593,7 @@ class StickerPackPageState extends State<StickerPackPage> {
           outputFile: output,
           quality: quality,
           fps: fps,
+          cropToSquare: cropToSquare,
         );
         if (sourceDurationMs == 0 && reportedDurationMs > 0) sourceDurationMs = reportedDurationMs;
         final data = await File(output).readAsBytes();

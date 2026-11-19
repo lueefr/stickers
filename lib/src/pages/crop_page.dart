@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:math';
 import 'dart:ui' as ui;
 
 import 'package:extended_image/extended_image.dart';
@@ -129,40 +128,116 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
   bool _alreadyFillsSquare(ui.Image? image, double rotation) =>
       image != null && image.width == image.height && rotation.truncate() % 360 == 0;
 
+  bool _isCropping = false;
+
+  Widget _ratioChip(String label, double? ratio) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: _aspectRatio == ratio,
+        onSelected: (_) {
+          _editorController.updateCropAspectRatio(ratio);
+          setState(() => _aspectRatio = ratio);
+          HapticFeedback.lightImpact();
+        },
+      ),
+    );
+  }
+
+  void _resetCrop() {
+    _editorController.reset();
+    setState(() => _aspectRatio = null);
+  }
+
+  Future<void> _finishCrop() async {
+    if (_isCropping) return;
+    final editor = widget.editorKey.currentState;
+    final rect = editor?.getCropRect();
+    if (editor == null || rect == null) return;
+
+    final l10n = AppLocalizations.of(context)!;
+    if (rect.width < .5 || rect.height < .5) {
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(l10n.cropTooSmall),
+          content: Text(l10n.cropTooSmallDetails),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l10n.done)),
+          ],
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isCropping = true);
+    try {
+      final result = await cropSticker(
+        rect, editor.rawImageData, widget.pack, widget.index, _editorController.rotateDegrees,
+      );
+      final file = await saveTemp(result);
+      if (!mounted) return;
+      await Navigator.of(context).pushNamed(
+        "/edit",
+        arguments: EditArguments(
+          pack: widget.pack,
+          index: widget.index,
+          mediaPath: file.path,
+        ),
+      );
+    } catch (e) {
+      debugPrint("Couldn't finish the crop: $e");
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => ErrorDialog(
+          title: l10n.cropYourSticker,
+          message: l10n.errorMessage + e.toString(),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isCropping = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final colors = Theme.of(context).colorScheme;
+
     return DefaultActivity(
       appBar: AppBar(
-        title: Text(AppLocalizations.of(context)!.cropYourSticker),
+        title: Text(l10n.cropYourSticker),
+        actions: [
+          IconButton(
+            tooltip: l10n.cropReset,
+            icon: const Icon(Icons.restart_alt),
+            onPressed: _resetCrop,
+          ),
+        ],
       ),
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          //TODO make loading less abrupt
           children: [
             Expanded(
               child: Container(
-                // The clip and empty BoxDecoration is intentional, sometimes the done button doesn't appear otherwise
-                // See: https://github.com/lolocomotive/stickers/issues/1
                 clipBehavior: Clip.antiAlias,
                 decoration: const BoxDecoration(),
-                // The mask animation used to call setState on this entire page
-                // for every tick, rebuilding all controls and the editor. Keep
-                // the animation confined to the image editor subtree.
                 child: AnimatedBuilder(
                   animation: _maskColorAnimation,
                   builder: (context, _) => ExtendedImage.file(
                     File(widget.imagePath),
-                  fit: BoxFit.contain,
-                  beforePaintImage: (canvas, rect, image, paint) {
-                    CheckerPainter.checkerPainter(canvas, rect, context);
-                    return false;
-                  },
-                  mode: ExtendedImageMode.editor,
-                  extendedImageEditorKey: widget.editorKey,
-                  cacheRawData: true,
-                  initEditorConfigHandler: (state) {
-                    return EditorConfig(
+                    fit: BoxFit.contain,
+                    beforePaintImage: (canvas, rect, image, paint) {
+                      CheckerPainter.checkerPainter(canvas, rect, context);
+                      return false;
+                    },
+                    mode: ExtendedImageMode.editor,
+                    extendedImageEditorKey: widget.editorKey,
+                    cacheRawData: true,
+                    initEditorConfigHandler: (state) => EditorConfig(
                       editorMaskColorHandler: (ctx, pointerDown) {
                         if (_previousPtrVal && !pointerDown) {
                           _maskColorController.animateTo(1, duration: const Duration(milliseconds: 150));
@@ -172,253 +247,115 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
                         }
                         _previousPtrVal = pointerDown;
                         return Color.lerp(
-                          Theme.of(context).colorScheme.surface.withAlpha(50),
-                          Theme.of(context).colorScheme.surface.withAlpha(200),
+                          colors.surface.withAlpha(50),
+                          colors.surface.withAlpha(200),
                           _maskColorAnimation.value,
                         )!;
                       },
                       animationCurve: Curves.ease,
                       tickerDuration: const Duration(),
                       lineHeight: 3,
-                      lineColor: Theme.of(context).colorScheme.primary.withAlpha(100),
-                      animationDuration: const Duration(milliseconds: 400),
-                      maxScale: double.infinity,
-                      cropRectPadding: const EdgeInsets.all(40.0),
-                      hitTestSize: 80.0,
+                      lineColor: colors.primary.withAlpha(160),
+                      animationDuration: const Duration(milliseconds: 350),
+                      maxScale: 12,
+                      cropRectPadding: const EdgeInsets.all(24),
+                      hitTestSize: 80,
                       cropAspectRatio: _aspectRatio,
-                      cornerColor: Theme.of(context).colorScheme.primary,
+                      cornerColor: colors.primary,
                       cornerSize: const Size(30, 5),
                       controller: _editorController,
-                    );
-                  },
-                ),
+                    ),
+                  ),
                 ),
               ),
             ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    IconButton(
-                      tooltip: "Undo",
-                      onPressed: () {
-                        _editorController.undo();
-                        setState(() {});
-                      },
-                      icon: const Icon(Icons.undo),
-                    ),
-                    IconButton(
-                      tooltip: "Rotate left",
-                      onPressed: () {
-                        _editorController.rotate(degree: -90, animation: true);
-                        setState(() {});
-                      },
-                      icon: const Icon(Icons.rotate_left),
-                    ),
-                    IconButton(
-                      tooltip: "Rotate -1°",
-                      onPressed: () {
-                        _editorController.rotate(degree: -1, animation: true, rotateCropRect: false);
-                        setState(() {});
-                      },
-                      icon: const Icon(Icons.rotate_90_degrees_ccw),
-                    ),
-                    IconButton(
-                      tooltip: "Rotate +1°",
-                      onPressed: () {
-                        _editorController.rotate(degree: 1, animation: true, rotateCropRect: false);
-                        setState(() {});
-                      },
-                      icon: const Icon(Icons.rotate_90_degrees_cw),
-                    ),
-                    IconButton(
-                      tooltip: "Rotate right",
-                      onPressed: () {
-                        _editorController.rotate(degree: 90, animation: true);
-                        setState(() {});
-                      },
-                      icon: const Icon(Icons.rotate_right),
-                    ),
-                    IconButton(
-                      tooltip: "Flip",
-                      onPressed: () {
-                        _editorController.flip(animation: true);
-                        setState(() {});
-                      },
-                      icon: const Icon(Icons.flip),
-                    ),
-                    IconButton(
-                      tooltip: "Reset",
-                      onPressed: () {
-                        _editorController.reset();
-                        setState(() {
-                          _aspectRatio = null;
-                        });
-                      },
-                      icon: const Icon(Icons.restart_alt),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: SegmentedButton<double>(
-                    showSelectedIcon: false,
-                    emptySelectionAllowed: true,
-                    multiSelectionEnabled: false,
-                    segments: [
-                      ButtonSegment(
-                          value: 0,
-                          icon: Column(children: [
-                            const Icon(Icons.crop_free),
-                            const Text(
-                              "Free",
-                              style: TextStyle(fontSize: 10),
-                            )
-                          ])),
-                      ButtonSegment(
-                          value: 16 / 9,
-                          icon: Column(children: [
-                            const Icon(Icons.crop_16_9),
-                            const Text(
-                              "16:9",
-                              style: TextStyle(fontSize: 10),
-                            )
-                          ])),
-                      ButtonSegment(
-                          value: 3 / 2,
-                          icon: Column(children: [
-                            const Icon(Icons.crop_3_2),
-                            const Text(
-                              "3:2",
-                              style: TextStyle(fontSize: 10),
-                            )
-                          ])),
-                      ButtonSegment(
-                          value: 1,
-                          icon: Column(children: [
-                            const Icon(Icons.crop_din),
-                            const Text(
-                              "1:1",
-                              style: TextStyle(fontSize: 10),
-                            )
-                          ])),
-                      ButtonSegment(
-                          value: 2 / 3,
-                          icon: Column(children: [
-                            Transform.rotate(
-                              angle: pi / 2,
-                              child: Icon(Icons.crop_3_2),
-                            ),
-                            const Text(
-                              "2:3",
-                              style: TextStyle(fontSize: 10),
-                            )
-                          ])),
-                      ButtonSegment(
-                          value: 9 / 16,
-                          icon: Column(children: [
-                            Transform.rotate(
-                              angle: pi / 2,
-                              child: Icon(Icons.crop_16_9),
-                            ),
-                            const Text(
-                              "9:16",
-                              style: TextStyle(fontSize: 10),
-                            )
-                          ])),
-                    ],
-                    selected: {_aspectRatio == null ? 0 : _aspectRatio!},
-                    onSelectionChanged: (v) {
-                      setState(() {
-                        final selected = v.firstOrNull;
-                        _aspectRatio = selected == 0 ? null : selected;
-                        _editorController.updateCropAspectRatio(_aspectRatio);
-                        HapticFeedback.lightImpact();
-                      });
-                    },
-                  ),
-                ),
-                Column(
+            Material(
+              color: colors.surface,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                    Text(
+                      l10n.cropDragHint,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 8),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
                         children: [
-                          OutlinedButton.icon(
-                            onPressed: _isStretching ? null : _stretchToSquare,
-                            icon: const Icon(Icons.aspect_ratio),
-                            label: Text(
-                                AppLocalizations.of(context)!.stretchToSquare),
-                          ),
-                          const SizedBox(height: 8),
-                          FilledButton(
-                            onPressed: () async {
-                              final state = widget.editorKey.currentState!;
-                              if (state.getCropRect()!.height < .5 || state.getCropRect()!.width < .5) {
-                                showDialog(
-                                    context: context,
-                                    builder: (ctx) => AlertDialog(
-                                          title: Text(AppLocalizations.of(context)!.cropTooSmall),
-                                          content:
-                                              Text(AppLocalizations.of(context)!.cropTooSmallDetails),
-                                          actions: [
-                                            TextButton(
-                                                onPressed: () => Navigator.of(context).pop(),
-                                                child: Text("Okay 💗")),
-                                            FilledButton(
-                                                onPressed: () => Navigator.of(context).pop(),
-                                                child: Text("Yay 💗")),
-                                          ],
-                                        ));
-                                return;
-                              }
-                              try {
-                                final cropped = await cropSticker(
-                                    state.getCropRect()!,
-                                    state.rawImageData,
-                                    widget.pack,
-                                    widget.index,
-                                    _editorController.rotateDegrees);
-                                final output = await saveTemp(cropped);
-                                if (!context.mounted) return;
-                                Navigator.of(context).pushNamed(
-                                  "/edit",
-                                  arguments: EditArguments(
-                                    pack: widget.pack,
-                                    index: widget.index,
-                                    mediaPath: output.path,
-                                  ),
-                                );
-                              } catch (e) {
-                                // Do not leave the user with a button that
-                                // looks like it did nothing: the exception
-                                // would otherwise only reach the Flutter error
-                                // zone, which is invisible on a release build.
-                                debugPrint("Couldn't finish the crop: $e");
-                                if (!context.mounted) return;
-                                showDialog(
-                                  context: context,
-                                  builder: (context) => ErrorDialog(
-                                    title: AppLocalizations.of(context)!.done,
-                                    message: AppLocalizations.of(context)!.errorMessage + e.toString(),
-                                  ),
-                                );
-                              }
-                            },
-                            child: Text(AppLocalizations.of(context)!.done),
-                          ),
+                          _ratioChip(l10n.cropFree, null),
+                          _ratioChip(l10n.cropSquare, 1),
+                          _ratioChip(l10n.cropPortrait, 3 / 4),
+                          _ratioChip(l10n.cropLandscape, 4 / 3),
+                          _ratioChip("16:9", 16 / 9),
+                          _ratioChip("9:16", 9 / 16),
                         ],
                       ),
                     ),
+                    const SizedBox(height: 4),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          IconButton(
+                            tooltip: "Undo",
+                          onPressed: () => _editorController.undo(),
+                          icon: const Icon(Icons.undo),
+                        ),
+                        IconButton(
+                          tooltip: "Rotate left",
+                          onPressed: () => _editorController.rotate(degree: -90, animation: true),
+                          icon: const Icon(Icons.rotate_left),
+                        ),
+                        IconButton(
+                          tooltip: "Rotate right",
+                          onPressed: () => _editorController.rotate(degree: 90, animation: true),
+                          icon: const Icon(Icons.rotate_right),
+                        ),
+                        IconButton(
+                          tooltip: "Rotate -1°",
+                          onPressed: () => _editorController.rotate(
+                            degree: -1, animation: true, rotateCropRect: false,
+                          ),
+                          icon: const Icon(Icons.rotate_90_degrees_ccw),
+                        ),
+                        IconButton(
+                          tooltip: "Rotate +1°",
+                          onPressed: () => _editorController.rotate(
+                            degree: 1, animation: true, rotateCropRect: false,
+                          ),
+                          icon: const Icon(Icons.rotate_90_degrees_cw),
+                        ),
+                        IconButton(
+                          tooltip: "Flip",
+                          onPressed: () => _editorController.flip(animation: true),
+                          icon: const Icon(Icons.flip),
+                        ),
+                      ],
+                    ),
+                    ),
+                    const SizedBox(height: 4),
+                    OutlinedButton.icon(
+                      onPressed: _isStretching || _isCropping ? null : _stretchToSquare,
+                      icon: const Icon(Icons.aspect_ratio),
+                      label: Text(l10n.stretchToSquare),
+                    ),
+                    const SizedBox(height: 6),
+                    FilledButton.icon(
+                      onPressed: _isCropping || _isStretching ? null : _finishCrop,
+                      icon: _isCropping
+                          ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.check),
+                      label: Text(l10n.done),
+                    ),
                   ],
-                )
-              ],
+                ),
+              ),
             ),
           ],
         ),

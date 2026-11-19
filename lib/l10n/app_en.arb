@@ -215,4 +215,14 @@
   },
   "animatedStickerReadyToSend": "Sticker ready. Add the pack to WhatsApp to use it.",
   "creatingAnimatedSticker": "Creating animated sticker..."
+,
+  "cropDragHint": "Drag to reposition, pinch to zoom, and adjust the edges.",
+  "cropFree": "Free",
+  "cropSquare": "Square",
+  "cropPortrait": "Portrait",
+  "cropLandscape": "Landscape",
+  "cropReset": "Reset",
+  "cropFill": "Fill square",
+  "cropFit": "Fit whole frame",
+  "cropGifModeTitle": "Crop animated GIF"
 }

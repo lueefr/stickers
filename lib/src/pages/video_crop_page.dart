@@ -1,5 +1,5 @@
+import 'dart:async';
 import 'dart:io';
-import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:stickers/generated/intl/app_localizations.dart';
@@ -131,26 +131,31 @@ class _VideoCropPageState extends State<VideoCropPage> {
                   children: [
                     Center(
                       child: _ready
-                          ? Container(
-                              decoration: BoxDecoration(
-                                border: _cropToSquare
-                                    ? Border.all(color: Theme.of(context).colorScheme.primary, width: 3)
-                                    : null,
-                              ),
-                              width: _cropToSquare
-                                  ? min(MediaQuery.of(context).size.width, MediaQuery.of(context).size.height)
-                                  : null,
-                              height: _cropToSquare
-                                  ? min(MediaQuery.of(context).size.width, MediaQuery.of(context).size.height)
-                                  : null,
-                              clipBehavior: Clip.antiAlias,
-                              child: Transform.rotate(
-                                angle: _rotationDegrees * pi / 180,
-                                child: AspectRatio(
-                                  aspectRatio: _rotationDegrees % 180 == 0
-                                      ? _controller.value.aspectRatio
-                                      : 1 / _controller.value.aspectRatio,
-                                  child: VideoPlayer(_controller),
+                          ? Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: AspectRatio(
+                                aspectRatio: 1,
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                    border: Border.all(color: Theme.of(context).colorScheme.primary, width: 2),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: FittedBox(
+                                      fit: _cropToSquare ? BoxFit.cover : BoxFit.contain,
+                                      clipBehavior: Clip.hardEdge,
+                                      child: RotatedBox(
+                                        quarterTurns: ((_rotationDegrees ~/ 90) % 4 + 4) % 4,
+                                        child: SizedBox(
+                                          width: _controller.value.size.width,
+                                          height: _controller.value.size.height,
+                                          child: VideoPlayer(_controller),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ),
                             )
@@ -213,13 +218,16 @@ class _VideoCropPageState extends State<VideoCropPage> {
                         }),
                         icon: const Icon(Icons.rotate_left),
                       ),
-                      FilterChip(
-                        selected: _cropToSquare,
-                        label: const Text("Square crop"),
-                        avatar: const Icon(Icons.crop_square),
-                        onSelected: (value) => setState(() {
-                          _cropToSquare = value;
-                        }),
+                      SegmentedButton<bool>(
+                        showSelectedIcon: false,
+                        segments: [
+                          ButtonSegment(value: true, label: Text(AppLocalizations.of(context)!.cropFill),
+                              icon: const Icon(Icons.crop_square)),
+                          ButtonSegment(value: false, label: Text(AppLocalizations.of(context)!.cropFit),
+                              icon: const Icon(Icons.fit_screen)),
+                        ],
+                        selected: {_cropToSquare},
+                        onSelectionChanged: (values) => setState(() => _cropToSquare = values.first),
                       ),
                       IconButton(
                         tooltip: "Rotate right",
@@ -240,6 +248,10 @@ class _VideoCropPageState extends State<VideoCropPage> {
                       valueListenable: _rangeNotifier,
                       builder: (context, range, _) => RangeSlider(
                         values: range,
+                        labels: RangeLabels(
+                          _formatTime(_controller.value.duration * range.start),
+                          _formatTime(_controller.value.duration * range.end),
+                        ),
                         onChangeStart: (_) {
                           _controller.pause();
                           _editing = true;
@@ -273,6 +285,17 @@ class _VideoCropPageState extends State<VideoCropPage> {
                     ),
                   ],
                 ),
+                if (_ready)
+                  ValueListenableBuilder<RangeValues>(
+                    valueListenable: _rangeNotifier,
+                    builder: (context, range, _) => Text(
+                      '${_formatTime(_controller.value.duration * range.start)} – '
+                      '${_formatTime(_controller.value.duration * range.end)} '
+                      '(${_formatTime(_controller.value.duration * (range.end - range.start))})',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                  ),
                 if (_ready && _controller.value.duration.inMilliseconds > maxAnimatedStickerDurationMs)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
@@ -339,18 +362,20 @@ class _VideoCropPageState extends State<VideoCropPage> {
     _rangeNotifier.value = range;
   }
 
-  Future<void> _finishRangeEdit() async {
-    if (_seekTarget == _controller.value.duration * _range.end) {
-      _requestSeek(_controller.value.duration * _range.end - const Duration(seconds: 1));
-      if (_seekTarget < _controller.value.duration * _range.start) {
-        _seekTarget = _controller.value.duration * _range.start;
-      }
-    }
-    _play();
-    await Future<void>.delayed(const Duration(milliseconds: 200));
-    if (!mounted) return;
+  void _finishRangeEdit() {
+    // Rewind to the selected beginning instead of seeking before the selection
+    // when its ending is shorter than a second.
+    _requestSeek(_controller.value.duration * _range.start);
     _editing = false;
     _editingNotifier.value = false;
+    _play();
+  }
+
+  String _formatTime(Duration value) {
+    final totalSeconds = value.inSeconds;
+    final minutes = totalSeconds ~/ 60;
+    final seconds = (totalSeconds % 60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
   }
 
   void _requestSeek(Duration time) async {
@@ -390,30 +415,34 @@ class _VideoCropPageState extends State<VideoCropPage> {
       final videoDuration = _controller.value.duration;
       final start = videoDuration * _range.start;
       final end = start + clampAnimatedDuration(videoDuration * _range.end - start);
-      await service.start(
-        inputFile: widget.imagePath,
-        outputFile: output,
-        start: start,
-        end: end,
-        rotationDegrees: _rotationDegrees,
-        cropToSquare: _cropToSquare,
-      );
-      await for (final s in service.progressStream) {
-        if (s.status == Status.success) {
-          break;
-        } else if (s.status == Status.failed) {
-          debugPrint("Transcoding failed!");
-          if (mounted) {
-            showDialog(
-              context: context,
-              builder: (context) => ErrorDialog(
-                title: AppLocalizations.of(context)!.trimFailed,
-                message: AppLocalizations.of(context)!.trimFailedMsg,
-              ),
-            );
-          }
-          throw Exception();
+      // Attach before starting the native job: fast failures otherwise race
+      // with the broadcast stream and leave the editor waiting forever.
+      final completion = Completer<Progress>();
+      final subscription = service.progressStream.listen((update) {
+        if ((update.status == Status.success || update.status == Status.failed ||
+                update.status == Status.cancelled) &&
+            !completion.isCompleted) {
+          completion.complete(update);
         }
+      });
+      try {
+        await service.start(
+          inputFile: widget.imagePath,
+          outputFile: output,
+          start: start,
+          end: end,
+          rotationDegrees: _rotationDegrees,
+          cropToSquare: _cropToSquare,
+        );
+        final result = await completion.future.timeout(const Duration(minutes: 3));
+        if (result.status != Status.success) {
+          throw StateError('Video transcoding ended with ${result.status.name}');
+        }
+        if (!await File(output).exists() || await File(output).length() == 0) {
+          throw StateError('Video transcoding produced no output');
+        }
+      } finally {
+        await subscription.cancel();
       }
       if (!mounted) return;
       Navigator.of(context).pushNamed(
@@ -425,6 +454,17 @@ class _VideoCropPageState extends State<VideoCropPage> {
           type: MediaType.video,
         ),
       );
+    } on Exception catch (e) {
+      debugPrint('Could not trim video: $e');
+      if (mounted) {
+        await showDialog<void>(
+          context: context,
+          builder: (context) => ErrorDialog(
+            title: AppLocalizations.of(context)!.trimFailed,
+            message: '${AppLocalizations.of(context)!.trimFailedMsg}\n\n$e',
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _exporting = false);
     }
