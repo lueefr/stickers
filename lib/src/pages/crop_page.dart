@@ -297,11 +297,13 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        IconButton(
-                          tooltip: "Undo",
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          IconButton(
+                            tooltip: "Undo",
                           onPressed: () => _editorController.undo(),
                           icon: const Icon(Icons.undo),
                         ),
@@ -335,6 +337,7 @@ class _CropPageState extends State<CropPage> with TickerProviderStateMixin {
                           icon: const Icon(Icons.flip),
                         ),
                       ],
+                    ),
                     ),
                     const SizedBox(height: 4),
                     OutlinedButton.icon(

@@ -495,8 +495,6 @@ class StickerPackPageState extends State<StickerPackPage> {
                 children: [
                   Text(l10n.cropGifModeTitle, style: Theme.of(context).textTheme.titleLarge),
                   const SizedBox(height: 10),
-                  Text(l10n.cropDragHint, textAlign: TextAlign.center),
-                  const SizedBox(height: 16),
                   SizedBox.square(
                     dimension: 184,
                     child: ClipRRect(
