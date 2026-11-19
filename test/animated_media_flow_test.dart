@@ -270,6 +270,7 @@ void main() {
       () => find.text('Fill square').evaluate().isNotEmpty,
     );
     expect(pickerShown, isTrue, reason: 'GIF crop choices must appear after creating the pack');
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Done').last);
     await tester.pump();
     final sheetClosed = await pumpUntil(tester, () => find.text('Crop animated GIF').evaluate().isEmpty);
@@ -335,6 +336,7 @@ void main() {
       () => find.text('Fit whole frame').evaluate().isNotEmpty,
     );
     expect(pickerShown, isTrue, reason: 'GIF crop choices must appear before converting');
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Fit whole frame'));
     await tester.pump();
     await tester.tap(find.text('Done').last);
