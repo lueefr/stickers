@@ -32,7 +32,8 @@ class GifToWebP {
         outputFile: File,
         config: WebPConfig,
         fps: Int,
-        maxDurationMs: Int = MAX_ANIMATED_DURATION_MS
+        maxDurationMs: Int = MAX_ANIMATED_DURATION_MS,
+        cropToSquare: Boolean = true
     ): Int {
         val gifBytes = inputFile.readBytes()
         val movie = Movie.decodeByteArray(gifBytes, 0, gifBytes.size)
@@ -43,10 +44,13 @@ class GifToWebP {
         val sourceDurationMs = if (movie.duration() > 0) movie.duration() else 1000
         val duration = min(sourceDurationMs, max(1, maxDurationMs))
         val frameIntervalMs = max(1, 1000 / max(1, fps))
-        val scale = max(
-            OUTPUT_DIMENSION.toFloat() / width.toFloat(),
-            OUTPUT_DIMENSION.toFloat() / height.toFloat()
-        )
+        // Fill clips the outer edges; fit keeps the whole animation with
+        // transparent margins. The preview and export use the same choice.
+        val scale = if (cropToSquare) {
+            max(OUTPUT_DIMENSION.toFloat() / width, OUTPUT_DIMENSION.toFloat() / height)
+        } else {
+            min(OUTPUT_DIMENSION.toFloat() / width, OUTPUT_DIMENSION.toFloat() / height)
+        }
         val dx = (OUTPUT_DIMENSION - width * scale) / 2f
         val dy = (OUTPUT_DIMENSION - height * scale) / 2f
 

@@ -241,6 +241,7 @@ void main() {
       conversions++;
       final args = call.arguments as Map<Object?, Object?>;
       expect(args['maxDurationMs'], 10 * 1000, reason: 'the native side is told the limit too');
+      expect(args['cropToSquare'], true);
       await File(args['outputFile']! as String).writeAsBytes(base64Decode(_kPng1x1));
       return 12000;
     });
@@ -264,6 +265,9 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     await confirmCreatePackDialog(tester, title: 'GIF pack');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Done').last);
+    await tester.pump();
     final added = await pumpUntil(
       tester,
       () => packs.last.stickers.isNotEmpty && noticeShown('Sticker ready'),
@@ -302,6 +306,7 @@ void main() {
       if (call.method != 'convertGif') return null;
       conversions++;
       final args = call.arguments as Map<Object?, Object?>;
+      expect(args['cropToSquare'], false);
       await File(args['outputFile']! as String).writeAsBytes(base64Decode(_kPng1x1));
       return 3000;
     });
@@ -319,8 +324,11 @@ void main() {
     await tester.tap(find.text('Replace'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('GIF'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Fit whole frame'));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Done').last);
+    await tester.pump();
     final replaced = await pumpUntil(
       tester,
       () => animated.stickers.single.source != stickerFile.path && noticeShown('Sticker ready'),

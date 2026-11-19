@@ -212,4 +212,14 @@
   },
   "animatedStickerReadyToSend": "Figurinha pronta. Adicione o pacote ao WhatsApp para usá-la.",
   "creatingAnimatedSticker": "Criando figurinha animada..."
+,
+  "cropDragHint": "Arraste para reposicionar, aproxime com dois dedos e ajuste as bordas.",
+  "cropFree": "Livre",
+  "cropSquare": "Quadrado",
+  "cropPortrait": "Retrato",
+  "cropLandscape": "Paisagem",
+  "cropReset": "Redefinir",
+  "cropFill": "Preencher quadrado",
+  "cropFit": "Mostrar inteiro",
+  "cropGifModeTitle": "Recortar GIF animado"
 }

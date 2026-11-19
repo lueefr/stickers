@@ -20,11 +20,13 @@ class GifToWebPService {
     required double quality,
     required int fps,
     int maxDurationMs = maxAnimatedStickerDurationMs,
+    bool cropToSquare = true,
   }) async {
     final sourceDurationMs = await _methodChannel.invokeMethod<int>('convertGif', {
       'inputFile': inputFile,
       'outputFile': outputFile,
       'fps': fps,
+      'cropToSquare': cropToSquare,
       'maxDurationMs': maxDurationMs,
       'config': WebPConfig(
         lossless: false,

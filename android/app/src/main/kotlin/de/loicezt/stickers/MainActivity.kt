@@ -123,7 +123,10 @@ class MainActivity : FlutterActivity() {
                             // the caller can tell the user when only a part of it
                             // became the sticker.
                             val sourceDurationMs =
-                                gifToWebP.convert(inputFile, outputFile, config, fps, maxDurationMs)
+                                gifToWebP.convert(
+                                    inputFile, outputFile, config, fps, maxDurationMs,
+                                    args["cropToSquare"] as? Boolean ?: true
+                                )
                             // The method channel result has to be delivered on the
                             // platform thread.
                             withContext(Dispatchers.Main) { result.success(sourceDurationMs) }
