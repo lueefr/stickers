@@ -33,6 +33,6 @@ class PlatformStickerMediaSources implements StickerMediaSources {
       type: FileType.custom,
       allowedExtensions: ["gif"],
     );
-    return file.firstOrNull?.path;
+    return file?.firstOrNull?.path;
   }
 }

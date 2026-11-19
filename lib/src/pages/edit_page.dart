@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
@@ -548,7 +549,6 @@ else if (videoController != null)
   Future<Uint8List> exportAnimatedSticker(Uint8List overlayPng, BuildContext context) async {
     final overlayOption = ImageEditorOption()..outputFormat = const OutputFormat.webp_lossless();
     final out = await ImageEditor.editImageAndGetFile(image: overlayPng, imageEditorOption: overlayOption);
-    if (out == null) throw StateError('Could not render the video overlay');
     final service = OverlayAndEncodeService();
     // The cache directory can be wiped by the OS at any time without the app
     // restarting, so make sure it is there before writing into it.
@@ -600,14 +600,6 @@ else if (videoController != null)
           debugPrint("Export attempt ${attempt + 1} ended with ${result.status.name}");
           quality -= 20;
           fps = max(1, (fps / 2).round());
-          continue;
-        }
-        if (failed) {
-          // Lowering the quality and the frame rate gives the encoder less work,
-          // so a later attempt can still succeed.
-          quality -= 20;
-          fps = max(1, (fps / 2).round());
-          debugPrint("New configuration: q=$quality fps=$fps");
           continue;
         }
         debugPrint("Exported WebP in ${sw.elapsedMilliseconds}ms");
